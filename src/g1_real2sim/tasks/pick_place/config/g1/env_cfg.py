@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 from isaaclab.envs import ManagerBasedRLEnvCfg
-from isaaclab.envs.mdp import JointPositionActionCfg
+from isaaclab.envs.mdp import JointPositionActionCfg, joint_pos_rel, joint_vel_rel
 from isaaclab.managers import EventTermCfg as EventTerm
 from isaaclab.managers import ObservationGroupCfg as ObsGroup
 from isaaclab.managers import ObservationTermCfg as ObsTerm
@@ -38,7 +38,8 @@ class ObservationsCfg:
     class PolicyCfg(ObsGroup):
         """Policy observation terms."""
 
-        observation = ObsTerm(func=mdp.observation)
+        joint_pos = ObsTerm(func=joint_pos_rel)
+        joint_vel = ObsTerm(func=joint_vel_rel)
 
     policy: PolicyCfg = PolicyCfg()
 
