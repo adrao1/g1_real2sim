@@ -2,7 +2,7 @@
 
 from isaaclab.assets import ArticulationCfg, AssetBaseCfg
 from isaaclab.scene import InteractiveSceneCfg
-from isaaclab.sim import DomeLightCfg
+from isaaclab.sim import DomeLightCfg, GroundPlaneCfg
 from isaaclab.utils import clone, configclass
 
 from isaaclab_assets.robots.unitree import G1_29DOF_CFG
@@ -13,6 +13,11 @@ class TabletopSceneCfg(InteractiveSceneCfg):
     """Scene containing a G1 robot with its base fixed in place."""
 
     robot: ArticulationCfg = clone(G1_29DOF_CFG)
+
+    ground = AssetBaseCfg(
+        prim_path="/World/GroundPlane",
+        spawn=GroundPlaneCfg(),
+    )
 
     light = AssetBaseCfg(
         prim_path="/World/Light",
