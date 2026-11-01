@@ -9,6 +9,7 @@ from isaaclab.envs.mdp import (
     joint_pos_rel,
     joint_vel_rel,
     reset_scene_to_default,
+    time_out,
 )
 from isaaclab.managers import EventTermCfg as EventTerm
 from isaaclab.managers import ObservationGroupCfg as ObsGroup
@@ -65,10 +66,9 @@ class RewardsCfg:
 
 @configclass
 class TerminationsCfg:
-    """Define termination and timeout terms."""
+    """End each episode when its time limit is reached."""
 
-    termination = DoneTerm(func=mdp.termination)
-    time_out = DoneTerm(func=mdp.time_out, time_out=True)
+    time_out = DoneTerm(func=time_out, time_out=True)
 
 
 @configclass
