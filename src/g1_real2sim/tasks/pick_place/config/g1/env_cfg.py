@@ -3,6 +3,8 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
+from isaaclab_physx.physics import PhysxCfg
+
 from isaaclab.envs import ManagerBasedRLEnvCfg
 from isaaclab.envs.mdp import (
     JointPositionActionCfg,
@@ -19,6 +21,7 @@ from isaaclab.sim import SimulationCfg
 from isaaclab.utils import configclass
 
 from g1_real2sim.scenes.tabletop_scene_cfg import TabletopSceneCfg
+
 
 @configclass
 class ActionsCfg:
@@ -73,5 +76,9 @@ class PickPlaceEnvCfg(ManagerBasedRLEnvCfg):
     terminations: TerminationsCfg = TerminationsCfg()
 
     def __post_init__(self) -> None:
-        """Set simulation timing, physics, and task parameters."""
-        raise NotImplementedError("Configure simulation, scene, and manager terms.")
+        """Configure simulation timing and the Isaac Sim PhysX backend."""
+        self.decimation = 4
+        self.episode_length_s = 20.0
+        self.sim.dt = 1 / 200
+        self.sim.render_interval = 2
+        self.sim.physics = PhysxCfg()
