@@ -1,0 +1,40 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: Current File",
+            "type": "debugpy",
+            "request": "launch",
+            // Use the interpreter recorded by `isaaclab --editor`; VS Code skips wrapper scripts such as python.sh
+            "python": "${config:python.defaultInterpreterPath}",
+            "program": "${file}",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Train G1Real2sim-Manipulation-G1 with rsl_rl (PPO)",
+            "type": "debugpy",
+            "request": "launch",
+            "python": "${config:python.defaultInterpreterPath}",
+            "module": "isaaclab",
+            "args": [
+                "train",
+                "--rl_library", "rsl_rl",
+                "--task", "G1Real2sim-Manipulation-G1",
+                "--num_envs", "4096"            ],
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Play G1Real2sim-Manipulation-G1 with rsl_rl (PPO)",
+            "type": "debugpy",
+            "request": "launch",
+            "python": "${config:python.defaultInterpreterPath}",
+            "module": "isaaclab",
+            "args": [
+                "play",
+                "--rl_library", "rsl_rl",
+                "--task", "G1Real2sim-Manipulation-G1",
+                "--num_envs", "32"            ],
+            "console": "integratedTerminal"
+        },
+    ]
+}
