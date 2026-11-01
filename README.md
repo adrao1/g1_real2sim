@@ -81,6 +81,11 @@ creating a sibling of `config/g1`; add another task by creating a sibling task-f
 
 ## Project assets
 
+The tabletop scene uses the bundled Unitree G1 29-DoF + Dex3 fixed-base USD under
+`src/g1_real2sim/assets/data/robots/g1-29dof-dex3-base-fix-usd`. Its `SOURCE.md` records the
+upstream source and revision. The scene retains Isaac Lab's `G1_29DOF_CFG` actuator settings and
+initial pose while selecting this USD, including its authored visual materials.
+
 Keep project-owned USD files and related data under `src/g1_real2sim/assets/data`. The asset module exposes a
 stable path that works from an editable checkout and an installed wheel:
 
