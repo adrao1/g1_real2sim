@@ -19,6 +19,7 @@ from isaaclab.managers import ObservationTermCfg as ObsTerm
 from isaaclab.managers import TerminationTermCfg as DoneTerm
 from isaaclab.sim import SimulationCfg
 from isaaclab.utils import configclass
+from isaaclab.visualizers import VisualizerCfg
 
 from g1_real2sim.scenes.tabletop_scene_cfg import TabletopSceneCfg
 
@@ -82,3 +83,7 @@ class PickPlaceEnvCfg(ManagerBasedRLEnvCfg):
         self.sim.dt = 1 / 200
         self.sim.render_interval = 2
         self.sim.physics = PhysxCfg()
+        self.sim.visualizer_cfgs = VisualizerCfg(
+            eye=(2.5, 2.5, 1.8),
+            lookat=(0.0, 0.0, 0.8),
+        )
