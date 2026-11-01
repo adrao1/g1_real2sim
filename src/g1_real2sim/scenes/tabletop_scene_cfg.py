@@ -8,6 +8,14 @@ from isaaclab.utils.assets import ISAACLAB_NUCLEUS_DIR
 
 from isaaclab_assets.robots.unitree import G1_29DOF_CFG
 
+from g1_real2sim.assets import G1_REAL2SIM_ASSETS_DIR
+
+
+UNITREE_G1_USD = (
+    G1_REAL2SIM_ASSETS_DIR
+    / "robots/g1-29dof-dex3-base-fix-usd/g1_29dof_with_dex3_base_fix.usd"
+)
+
 
 @configclass
 class TabletopSceneCfg(InteractiveSceneCfg):
@@ -40,4 +48,5 @@ class TabletopSceneCfg(InteractiveSceneCfg):
 
     def __post_init__(self) -> None:
         self.robot.prim_path = "{ENV_REGEX_NS}/Robot"
+        self.robot.spawn.usd_path = str(UNITREE_G1_USD)
         self.robot.spawn.fix_root_link = True
