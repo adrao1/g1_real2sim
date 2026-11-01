@@ -14,15 +14,11 @@ from isaaclab.envs.mdp import (
 from isaaclab.managers import EventTermCfg as EventTerm
 from isaaclab.managers import ObservationGroupCfg as ObsGroup
 from isaaclab.managers import ObservationTermCfg as ObsTerm
-from isaaclab.managers import RewardTermCfg as RewTerm
 from isaaclab.managers import TerminationTermCfg as DoneTerm
 from isaaclab.sim import SimulationCfg
 from isaaclab.utils import configclass
 
 from g1_real2sim.scenes.tabletop_scene_cfg import TabletopSceneCfg
-
-from ... import mdp
-
 
 @configclass
 class ActionsCfg:
@@ -58,13 +54,6 @@ class EventCfg:
 
 
 @configclass
-class RewardsCfg:
-    """Define task reward terms and weights."""
-
-    reward = RewTerm(func=mdp.reward, weight=1.0)
-
-
-@configclass
 class TerminationsCfg:
     """End each episode when its time limit is reached."""
 
@@ -80,7 +69,7 @@ class PickPlaceEnvCfg(ManagerBasedRLEnvCfg):
     actions: ActionsCfg = ActionsCfg()
     observations: ObservationsCfg = ObservationsCfg()
     events: EventCfg = EventCfg()
-    rewards: RewardsCfg = RewardsCfg()
+    rewards = None
     terminations: TerminationsCfg = TerminationsCfg()
 
     def __post_init__(self) -> None:
