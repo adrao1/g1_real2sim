@@ -5,7 +5,6 @@
 
 from dataclasses import MISSING
 
-from isaaclab.assets import ArticulationCfg
 from isaaclab.envs import ManagerBasedRLEnvCfg
 from isaaclab.managers import ActionTermCfg
 from isaaclab.managers import EventTermCfg as EventTerm
@@ -13,18 +12,12 @@ from isaaclab.managers import ObservationGroupCfg as ObsGroup
 from isaaclab.managers import ObservationTermCfg as ObsTerm
 from isaaclab.managers import RewardTermCfg as RewTerm
 from isaaclab.managers import TerminationTermCfg as DoneTerm
-from isaaclab.scene import InteractiveSceneCfg
 from isaaclab.sim import SimulationCfg
 from isaaclab.utils import configclass
 
+from g1_real2sim.scenes.tabletop_scene_cfg import TabletopSceneCfg
+
 from ... import mdp
-
-
-@configclass
-class PickPlaceSceneCfg(InteractiveSceneCfg):
-    """Define robot assets, ground, lighting, and other scene objects."""
-
-    robot: ArticulationCfg = MISSING
 
 
 @configclass
@@ -74,7 +67,7 @@ class PickPlaceEnvCfg(ManagerBasedRLEnvCfg):
     """Configure the manager-based task."""
 
     sim: SimulationCfg = SimulationCfg()
-    scene: PickPlaceSceneCfg = PickPlaceSceneCfg(num_envs=1, env_spacing=4.0)
+    scene: TabletopSceneCfg = TabletopSceneCfg(num_envs=1, env_spacing=4.0)
     actions: ActionsCfg = ActionsCfg()
     observations: ObservationsCfg = ObservationsCfg()
     events: EventCfg = EventCfg()
