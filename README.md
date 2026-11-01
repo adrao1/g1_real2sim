@@ -3,7 +3,7 @@
 An installable downstream Isaac Lab task package with a standard uv `src` layout.
 
 The registered tasks are:
-- `G1Real2sim-Manipulation-G1`
+- `G1Real2sim-PickPlace-G1`
 
 ## Implement the Task
 

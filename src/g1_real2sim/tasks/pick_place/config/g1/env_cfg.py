@@ -21,7 +21,7 @@ from ... import mdp
 
 
 @configclass
-class ManipulationSceneCfg(InteractiveSceneCfg):
+class PickPlaceSceneCfg(InteractiveSceneCfg):
     """Define robot assets, ground, lighting, and other scene objects."""
 
     robot: ArticulationCfg = MISSING
@@ -70,11 +70,11 @@ class TerminationsCfg:
 
 
 @configclass
-class ManipulationEnvCfg(ManagerBasedRLEnvCfg):
+class PickPlaceEnvCfg(ManagerBasedRLEnvCfg):
     """Configure the manager-based task."""
 
     sim: SimulationCfg = SimulationCfg()
-    scene: ManipulationSceneCfg = ManipulationSceneCfg(num_envs=1, env_spacing=4.0)
+    scene: PickPlaceSceneCfg = PickPlaceSceneCfg(num_envs=1, env_spacing=4.0)
     actions: ActionsCfg = ActionsCfg()
     observations: ObservationsCfg = ObservationsCfg()
     events: EventCfg = EventCfg()

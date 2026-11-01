@@ -13,9 +13,9 @@ import g1_real2sim.tasks  # noqa: F401
 def test_task_registrations():
     """The project tasks must expose valid environment and agent entry points."""
     expected = {
-        "G1Real2sim-Manipulation-G1": {
+        "G1Real2sim-PickPlace-G1": {
             "entry_point": "isaaclab.envs:ManagerBasedRLEnv",
-            "env_cfg_entry_point": "g1_real2sim.tasks.manipulation.config.g1.env_cfg:ManipulationEnvCfg",
+            "env_cfg_entry_point": "g1_real2sim.tasks.pick_place.config.g1.env_cfg:PickPlaceEnvCfg",
             "default_agent": "rsl_rl",
         },
     }
