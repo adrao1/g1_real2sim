@@ -4,7 +4,12 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 from isaaclab.envs import ManagerBasedRLEnvCfg
-from isaaclab.envs.mdp import JointPositionActionCfg, joint_pos_rel, joint_vel_rel
+from isaaclab.envs.mdp import (
+    JointPositionActionCfg,
+    joint_pos_rel,
+    joint_vel_rel,
+    reset_scene_to_default,
+)
 from isaaclab.managers import EventTermCfg as EventTerm
 from isaaclab.managers import ObservationGroupCfg as ObsGroup
 from isaaclab.managers import ObservationTermCfg as ObsTerm
@@ -48,7 +53,7 @@ class ObservationsCfg:
 class EventCfg:
     """Define reset and other event terms."""
 
-    reset = EventTerm(func=mdp.reset, mode="reset")
+    reset = EventTerm(func=reset_scene_to_default, mode="reset")
 
 
 @configclass
