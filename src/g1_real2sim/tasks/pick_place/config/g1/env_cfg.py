@@ -3,10 +3,8 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
-from dataclasses import MISSING
-
 from isaaclab.envs import ManagerBasedRLEnvCfg
-from isaaclab.managers import ActionTermCfg
+from isaaclab.envs.mdp import JointPositionActionCfg
 from isaaclab.managers import EventTermCfg as EventTerm
 from isaaclab.managers import ObservationGroupCfg as ObsGroup
 from isaaclab.managers import ObservationTermCfg as ObsTerm
@@ -22,9 +20,14 @@ from ... import mdp
 
 @configclass
 class ActionsCfg:
-    """Define action terms for your robot."""
+    """Control G1 joints relative to their default positions."""
 
-    action: ActionTermCfg = MISSING
+    joint_pos = JointPositionActionCfg(
+        asset_name="robot",
+        joint_names=[".*"],
+        scale=1.0,
+        use_default_offset=True,
+    )
 
 
 @configclass
