@@ -7,7 +7,7 @@ from pathlib import Path
 
 from isaaclab.app import add_launcher_args, launch_simulation
 from isaaclab.sensors.camera import CameraCfg
-from isaaclab.sim import PinholeCameraCfg
+from isaaclab.sim import PinholeCameraCfg, UsdPhysicsCollisionCfg
 
 from g1_real2sim.tasks.pick_place.config.g1.env_cfg import PickPlaceEnvCfg
 
@@ -23,6 +23,8 @@ def main() -> None:
     cfg.sim.device = args.device
     cfg.sim.render_interval = cfg.decimation
     cfg.scene.num_envs = 100
+    cfg.scene.object.spawn.collision_props = UsdPhysicsCollisionCfg(collision_enabled=False)
+    cfg.scene.object.spawn.rigid_props.kinematic_enabled = True
     cfg.scene.camera = CameraCfg(
         prim_path="{ENV_REGEX_NS}/Camera",
         update_period=0,
