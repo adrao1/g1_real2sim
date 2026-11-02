@@ -3,11 +3,8 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
-from isaaclab_physx.physics import PhysxCfg
-
 from isaaclab.envs import ManagerBasedRLEnvCfg
 from isaaclab.envs.mdp import (
-    JointPositionActionCfg,
     joint_pos_rel,
     joint_vel_rel,
     reset_scene_to_default,
@@ -18,22 +15,20 @@ from isaaclab.managers import ObservationGroupCfg as ObsGroup
 from isaaclab.managers import ObservationTermCfg as ObsTerm
 from isaaclab.managers import TerminationTermCfg as DoneTerm
 from isaaclab.sim import SimulationCfg
-from isaaclab.utils import configclass
+from isaaclab.utils import clone, configclass
 from isaaclab.visualizers import VisualizerCfg
+from isaaclab_physx.physics import PhysxCfg
+
+from isaaclab_tasks.contrib.locomanip_pick_place.configs.pink_controller_cfg import G1_UPPER_BODY_IK_ACTION_CFG
 
 from g1_real2sim.scenes.tabletop_scene_cfg import TabletopSceneCfg
 
 
 @configclass
 class ActionsCfg:
-    """Control G1 joints relative to their default positions."""
+    """Control both G1 wrists with Pink IK and the hands with joint targets."""
 
-    joint_pos = JointPositionActionCfg(
-        asset_name="robot",
-        joint_names=[".*"],
-        scale=1.0,
-        use_default_offset=True,
-    )
+    upper_body_ik = clone(G1_UPPER_BODY_IK_ACTION_CFG)
 
 
 @configclass
@@ -78,6 +73,16 @@ class PickPlaceEnvCfg(ManagerBasedRLEnvCfg):
 
     def __post_init__(self) -> None:
         """Configure simulation timing and the Isaac Sim PhysX backend."""
+        # Generate the IK model from this scene's USD. Its exported URDF uses
+        # unprefixed link names, unlike the prebuilt URDF in the Isaac Lab example.
+        controller = self.actions.upper_body_ik.controller
+        controller.usd_path = self.scene.robot.spawn.usd_path
+        left_wrist_task, right_wrist_task, posture_task = controller.variable_input_tasks
+        left_wrist_task.frame = "left_wrist_yaw_link"
+        right_wrist_task.frame = "right_wrist_yaw_link"
+        left_wrist_task.base_link_frame_name = "pelvis"
+        right_wrist_task.base_link_frame_name = "pelvis"
+        posture_task.controlled_frames = ["left_wrist_yaw_link", "right_wrist_yaw_link"]
         self.decimation = 4
         self.episode_length_s = 20.0
         self.sim.dt = 1 / 200
