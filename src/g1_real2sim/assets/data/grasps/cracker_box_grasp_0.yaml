@@ -1,0 +1,12 @@
+# GraspGenX unitree_g1 candidate from the Isaac YCB 003_cracker_box USD.
+# Pose is relative to the mesh frame used during inference; frame alignment
+# with the Isaac Lab object prim and G1 wrist still needs validation.
+format: isaac_grasp
+format_version: 1.0
+grasps:
+  grasp_0:
+    confidence: 0.9555773138999939
+    position: [0.13681238320754643, 0.06323811580959549, -0.002700392647611278]
+    orientation:
+      w: 0.7107708309974144
+      xyz: [-0.01900311398501114, -0.7025791409136521, -0.028744707602493622]
