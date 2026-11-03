@@ -9,8 +9,6 @@ print initial hand poses
 uv run --extra isaacsim python scripts/inspect_initial_hand_poses.py
 
 
-
-
 cd ~/code/GraspGenX
 generate grasp poses for an object
 uv run python scripts/demo_object_mesh.py \
@@ -22,3 +20,7 @@ uv run python scripts/demo_object_mesh.py \
   --topk_num_grasps 100 \
   --plot_top_mesh \
   --output_file /tmp/cracker_box_grasps.yml
+
+
+capture screenshots of 100 grasps generated from GraspGenX
+uv run --extra isaacsim python scripts/visualize_grasps.py
