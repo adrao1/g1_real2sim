@@ -28,3 +28,14 @@ uv run --extra isaacsim python scripts/visualize_grasps.py
 
 evaluate all 100 grasps in parallel with box collisions and gravity enabled
 uv run --extra isaacsim python scripts/evaluate_grasps.py
+
+rerun successful grasps from the 100-grasp results and save one MP4 per grasp
+uv run --extra isaacsim --extra video python scripts/evaluate_grasps.py \
+  --successful-from outputs/grasp_evaluation/results.csv --record-video
+
+rerun chosen grasps and save one MP4 per grasp
+uv run --extra isaacsim --extra video python scripts/evaluate_grasps.py \
+  --grasps 22 36 39 --record-video
+
+videos are saved under outputs/grasp_evaluation/videos and selected results under
+outputs/grasp_evaluation/selected_results.csv
