@@ -7,6 +7,10 @@ Run commands from this repository root.
 uv run --extra isaacsim isaaclab zero_agent \
   --task G1Real2sim-PickPlace-G1 --num_envs 1 --device cpu --viz kit
 
+# Save one screenshot of the mustard-bottle scene without generating grasps.
+uv run --extra isaacsim python scripts/screenshot_scene.py \
+  --item-config configs/items/mustard_bottle.yml
+
 # Evaluate every grasp in the bundled cracker-box YAML. Video is on by default;
 # 25 grasps run in parallel per batch. Only successful clips are retained.
 uv run --extra isaacsim --extra video python scripts/evaluate_contact_grasps.py
