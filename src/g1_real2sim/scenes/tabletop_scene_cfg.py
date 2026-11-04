@@ -10,15 +10,12 @@ from isaaclab_assets.robots.unitree import G1_29DOF_CFG
 
 from g1_real2sim.assets import G1_REAL2SIM_ASSETS_DIR
 
-UNITREE_G1_USD = (
-    G1_REAL2SIM_ASSETS_DIR
-    / "robots/g1-29dof-dex3-base-fix-usd/g1_29dof_with_dex3_base_fix.usd"
-)
+UNITREE_G1_USD = G1_REAL2SIM_ASSETS_DIR / "robots/g1-29dof-dex3-base-fix-usd/g1_29dof_with_dex3_base_fix.usd"
 
 
 @configclass
 class TabletopSceneCfg(InteractiveSceneCfg):
-    """Scene containing a fixed-base G1 robot and a tabletop cracker box."""
+    """Fixed-base G1 tabletop scene with a replaceable rigid item."""
 
     robot: ArticulationCfg = clone(G1_29DOF_CFG)
 
@@ -61,3 +58,16 @@ class TabletopSceneCfg(InteractiveSceneCfg):
         self.robot.prim_path = "{ENV_REGEX_NS}/Robot"
         self.robot.spawn.usd_path = str(UNITREE_G1_USD)
         self.robot.spawn.fix_root_link = True
+
+    def set_item(
+        self,
+        usd_path: str,
+        position: tuple[float, float, float],
+        rotation_xyzw: tuple[float, float, float, float],
+        scale: float = 1.0,
+    ) -> None:
+        """Choose the item's asset and reset pose before creating the scene."""
+        self.object.spawn.usd_path = usd_path
+        self.object.spawn.scale = (scale, scale, scale)
+        self.object.init_state.pos = position
+        self.object.init_state.rot = rotation_xyzw
