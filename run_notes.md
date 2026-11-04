@@ -23,4 +23,8 @@ uv run python scripts/demo_object_mesh.py \
 
 
 capture screenshots of 100 grasps generated from GraspGenX
+cd ~/code/g1_real2sim_ik
 uv run --extra isaacsim python scripts/visualize_grasps.py
+
+evaluate all 100 grasps in parallel with box collisions and gravity enabled
+uv run --extra isaacsim python scripts/evaluate_grasps.py
