@@ -39,3 +39,33 @@ uv run --extra isaacsim --extra video python scripts/evaluate_grasps.py \
 
 videos are saved under outputs/grasp_evaluation/videos and selected results under
 outputs/grasp_evaluation/selected_results.csv
+
+find the lowest observed fixed finger closure for the previously successful grasps
+uv run --extra isaacsim python scripts/find_closure_percentage.py \
+  --successful-from outputs/grasp_evaluation/results.csv
+
+test contact-guided closure independently on the previously successful grasps
+uv run --extra isaacsim python scripts/evaluate_contact_closure.py \
+  --successful-from outputs/grasp_evaluation/results.csv
+
+run either experiment on one chosen grasp and save videos (add --extra video)
+uv run --extra isaacsim --extra video python scripts/find_closure_percentage.py \
+  --grasps 22 --record-video
+uv run --extra isaacsim --extra video python scripts/evaluate_contact_closure.py \
+  --grasps 22 --record-video
+
+the fixed search records its three confirmation trials; contact closure records every trial
+
+record grasp 22 at exactly 40% closure and repeat to increase the chance of a successful video
+uv run --extra isaacsim --extra video python scripts/find_closure_percentage.py \
+  --grasps 22 --closure-percent 40 --repeats 5 --record-video
+
+record contact-guided grasp 22 with five fresh attempts
+uv run --extra isaacsim --extra video python scripts/evaluate_contact_closure.py \
+  --grasps 22 --repeats 5 --record-video
+
+the commands print paths to successful videos; direct 40% results are in
+outputs/grasp_evaluation/fixed_closure/percent_40_trials.csv
+
+fixed search results: outputs/grasp_evaluation/fixed_closure/{trials,choices}.csv
+contact results: outputs/grasp_evaluation/contact_closure/trials.csv
