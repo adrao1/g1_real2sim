@@ -46,6 +46,19 @@ uv run --extra isaacsim --extra video python scripts/evaluate_contact_grasps.py 
 uv run --extra isaacsim python scripts/evaluate_contact_grasps.py \
   --no-video --batch-size 100
 
+# Screen grasps at recording 03's first full object pose. This uses the same
+# bundled cracker-box grasp IDs as replay and saves the source frame in run.json.
+uv run --extra isaacsim python scripts/evaluate_contact_grasps.py \
+  --tracking-config configs/tracking/cracker_box_d415_03.yml \
+  --no-video --batch-size 100
+
+# Recheck successful grasps from that run with video before choosing an ID.
+# Replace SCREENING_RUN with the directory printed by the screening command.
+uv run --extra isaacsim --extra video python scripts/evaluate_contact_grasps.py \
+  --tracking-config configs/tracking/cracker_box_d415_03.yml \
+  --successful-from outputs/grasp_evaluation/contact_grasps/cracker_box/SCREENING_RUN/trials.csv \
+  --repeats 3
+
 # Re-evaluate the successes in an earlier result CSV.
 uv run --extra isaacsim --extra video python scripts/evaluate_contact_grasps.py \
   --successful-from outputs/grasp_evaluation/contact_closure_all100/trials.csv
@@ -66,5 +79,6 @@ Use `--grasp-file /path/to/grasps.yml` to supply existing poses, or
 `--regenerate-grasps` to refresh generated poses for a local USD.
 
 Each run gets a new directory under `outputs/grasp_evaluation/contact_grasps/<item>/`.
-Its `run.json` records the item, pose, scale, and grasp source; `trials.csv` records
+Its `run.json` records the item, pose, scale, and grasp source. Tracking-based
+runs also record the tracking YAML and first frame number. `trials.csv` records
 every attempt. The `video_file` column points to retained successful MP4s.

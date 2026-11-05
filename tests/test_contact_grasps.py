@@ -77,6 +77,48 @@ def test_item_preset_and_selection(evaluator, tmp_path):
     assert evaluator.select_grasps(argparse.Namespace(grasps=None, successful_from=results), grasps, item) == [4]
 
 
+def test_tracking_config_uses_first_world_pose_and_replay_grasps(evaluator, tmp_path):
+    usd = tmp_path / "item.usd"
+    usd.write_text("#usda 1.0\n")
+    (tmp_path / "item.yml").write_text(
+        yaml.safe_dump(
+            {
+                "name": "cracker_box",
+                "usd_path": "item.usd",
+                "scale": 1.0,
+                "position": [0.0, 0.4, 0.87],
+                "rotation_xyzw": [0.0, 0.0, 0.0, 1.0],
+            }
+        )
+    )
+    poses = tmp_path / "poses"
+    poses.mkdir()
+    (poses / "000010.txt").write_text("0 -1 0 0.1\n1 0 0 0.2\n0 0 1 0.3\n0 0 0 1\n")
+    (poses / "000011.txt").write_text("1 0 0 0.2\n0 1 0 0.3\n0 0 1 0.4\n0 0 0 1\n")
+    tracking = tmp_path / "tracking.yml"
+    tracking.write_text(
+        yaml.safe_dump(
+            {
+                "item_config": "item.yml",
+                "pose_dir": "poses",
+                "world_from_camera": [
+                    [1, 0, 0, 0.3],
+                    [0, 1, 0, -0.4],
+                    [0, 0, 1, 1.0],
+                    [0, 0, 0, 1],
+                ],
+            }
+        )
+    )
+    cfg = PickPlaceEnvCfg()
+    item, frame = evaluator.configure_tracked_item(cfg, tracking)
+    assert frame == 10
+    assert item.position == pytest.approx((0.4, -0.2, 1.3))
+    assert item.rotation_xyzw == pytest.approx((0.0, 0.0, 2**-0.5, 2**-0.5))
+    assert cfg.scene.object.init_state.pos == item.position
+    assert item.grasp_file == evaluator.DEFAULT_GRASPS
+
+
 def test_generated_grasps_use_scene_asset_and_scale(evaluator, tmp_path, monkeypatch):
     usd = tmp_path / "item.usd"
     usd.write_text("#usda 1.0\n")

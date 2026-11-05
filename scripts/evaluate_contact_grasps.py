@@ -13,7 +13,7 @@ import subprocess
 import tempfile
 import uuid
 import xml.etree.ElementTree as ET
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -27,6 +27,7 @@ from isaaclab.visualizers import ImageViewCfg
 
 from g1_real2sim.assets import G1_REAL2SIM_ASSETS_DIR
 from g1_real2sim.tasks.pick_place.config.g1.env_cfg import PickPlaceEnvCfg
+from g1_real2sim.tracking import load_tracking
 
 DEFAULT_GRASPS = G1_REAL2SIM_ASSETS_DIR / "grasps/cracker_box_grasps.yml"
 DEFAULT_OUTPUT_ROOT = Path("outputs/grasp_evaluation/contact_grasps")
@@ -123,6 +124,28 @@ def configure_item(cfg: PickPlaceEnvCfg, args: argparse.Namespace) -> Item:
     cfg.scene.set_item(usd_path, position, rotation, scale)
     resolved = cfg.scene.object
     return Item(name, resolved.spawn.usd_path, scale, resolved.init_state.pos, resolved.init_state.rot, grasp_file)
+
+
+def configure_tracked_item(cfg: PickPlaceEnvCfg, tracking_config: Path) -> tuple[Item, int]:
+    """Place the selected item at the recording's first world-frame pose."""
+    import torch
+
+    from isaaclab.utils.math import quat_from_matrix
+
+    item_path, frame_numbers, poses = load_tracking(tracking_config)
+    first_pose = poses[0]
+    quaternion = quat_from_matrix(torch.as_tensor(first_pose[:3, :3], dtype=torch.float64))
+    if not bool(torch.isfinite(quaternion).all()):
+        raise ValueError(f"First tracked rotation cannot be converted to a quaternion: {tracking_config}")
+    item_args = argparse.Namespace(
+        item_config=item_path,
+        item_position=tuple(float(value) for value in first_pose[:3, 3]),
+        item_rotation=tuple(float(value) for value in quaternion),
+    )
+    item = configure_item(cfg, item_args)
+    if item.name == "cracker_box" and item.grasp_file is None:
+        item = replace(item, grasp_file=DEFAULT_GRASPS)
+    return item, int(frame_numbers[0])
 
 
 def load_grasps(path: Path) -> dict[int, dict]:
@@ -548,6 +571,7 @@ def run_evaluation(
     selected: list[int],
     grasp_file: Path,
     output_dir: Path,
+    tracking_first_frame: int | None = None,
 ) -> None:
     video_dir = output_dir / "videos" if not args.no_video else None
     cfg.sim.device = args.device
@@ -572,6 +596,9 @@ def run_evaluation(
         "video_enabled": video_dir is not None,
         "status": "started",
     }
+    if args.tracking_config is not None:
+        manifest["tracking_config"] = str(args.tracking_config)
+        manifest["tracking_first_frame"] = tracking_first_frame
     manifest_file = output_dir / "run.json"
     manifest_file.write_text(json.dumps(manifest, indent=2) + "\n")
     results = []
@@ -637,6 +664,7 @@ def main() -> None:
     parser.add_argument(
         "--item-config", type=Path, help="YAML item preset: USD, scale, position, rotation, optional grasps"
     )
+    parser.add_argument("--tracking-config", type=Path, help="Use an item's first recorded world pose")
     parser.add_argument("--item-position", nargs=3, type=float, metavar=("X", "Y", "Z"))
     parser.add_argument("--item-rotation", nargs=4, type=float, metavar=("X", "Y", "Z", "W"))
     selection = parser.add_mutually_exclusive_group()
@@ -652,6 +680,10 @@ def main() -> None:
     parser.add_argument("--output-dir", type=Path, help="New or empty directory for this run")
     parser.set_defaults(device="cpu")
     args = parser.parse_args()
+    if args.tracking_config is not None and any(
+        value is not None for value in (args.item_config, args.item_position, args.item_rotation)
+    ):
+        parser.error("--tracking-config cannot be combined with --item-config, --item-position, or --item-rotation")
     if args.repeats < 1 or not math.isfinite(args.contact_threshold_n) or args.contact_threshold_n <= 0:
         parser.error("--repeats and --contact-threshold-n must be positive")
     if args.batch_size is None:
@@ -666,7 +698,12 @@ def main() -> None:
             parser.error("Default video requires: uv run --extra isaacsim --extra video ... (or use --no-video)")
     try:
         cfg = PickPlaceEnvCfg()
-        item = configure_item(cfg, args)
+        tracking_first_frame = None
+        if args.tracking_config is None:
+            item = configure_item(cfg, args)
+        else:
+            args.tracking_config = args.tracking_config.expanduser().resolve(strict=True)
+            item, tracking_first_frame = configure_tracked_item(cfg, args.tracking_config)
         grasp_file = obtain_grasps(item, args)
         grasps = load_grasps(grasp_file)
         selected = select_grasps(args, grasps, item)
@@ -674,7 +711,7 @@ def main() -> None:
     except (OSError, ValueError) as exc:
         parser.error(str(exc))
     print(f"Item: {item.name}; USD: {item.usd_path}; scale: {item.scale}; grasps: {grasp_file}", flush=True)
-    run_evaluation(cfg, args, item, grasps, selected, grasp_file, output_dir)
+    run_evaluation(cfg, args, item, grasps, selected, grasp_file, output_dir, tracking_first_frame)
 
 
 if __name__ == "__main__":

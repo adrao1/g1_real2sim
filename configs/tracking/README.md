@@ -42,6 +42,13 @@ still an estimate; visualizing it does not calibrate it.
 each full object pose, including its rotation. It initializes the simulated
 item at the first tracked pose, picks it with an object-relative grasp, and
 converts the remaining object poses to wrist targets using the measured grip.
+To choose a grasp for a recording, run `scripts/evaluate_contact_grasps.py`
+with `--tracking-config` pointing to this YAML. It places the item at the
+first tracked world pose and runs the existing approach, closure, and lift
+evaluation there. Its `run.json` records the YAML path and first frame number.
+For the cracker box, evaluation and replay use the same bundled grasp YAML by
+default, so a selected `grasp_id` can be passed to replay. If you supply
+`--grasp-file` to either script, use the same file in both.
 The recorded motion supplies the lift, transport, and lowering phases; the
 script opens the hand at the final pose. Pass the source video's actual frame
 rate with `--tracking-fps`. The current cracker-box camera rotation is still
