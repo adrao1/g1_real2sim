@@ -41,8 +41,11 @@ still an estimate; visualizing it does not calibrate it.
 `scripts/replay_tracked_pick_place.py` requires `world_from_camera` and uses
 the first full object pose, including its rotation, to initialize the simulated
 item and approach an object-relative grasp. It closes the fingers, checks for
-sustained thumb and opposing-finger contact, and stops. It does not lift or
-follow the recorded trajectory.
+sustained thumb and opposing-finger contact, then measures the actual grip.
+It lifts the item to the selected frame's height, moves it to that frame's full
+world pose, and holds the grasp. Choose the destination with `--target-frame`
+(default 86). The move is time-scaled independently of the recording's frame
+rate; the script does not release the item.
 To choose a grasp for a recording, run `scripts/evaluate_contact_grasps.py`
 with `--tracking-config` pointing to this YAML. It places the item at the
 first tracked world pose and runs the existing approach, closure, and lift
@@ -50,8 +53,8 @@ evaluation there. Its `run.json` records the YAML path and first frame number.
 For the cracker box, evaluation and replay use the same bundled grasp YAML by
 default, so a selected `grasp_id` can be passed to replay. If you supply
 `--grasp-file` to either script, use the same file in both.
-The current cracker-box camera rotation is still an estimate, so the starting
-pose should be treated as a simulation smoke test until that rotation is
-calibrated. Pass `--record-video` to save the grasp attempt as one MP4 in a new
-directory under `outputs/tracked_grasps/`. Use `--video-dir` to choose the directory;
+The current cracker-box camera rotation is still an estimate, so the poses
+should be treated as a simulation smoke test until that rotation is calibrated.
+Pass `--record-video` to save the grasp and move as one MP4 in a new directory
+under `outputs/tracked_moves/`. Use `--video-dir` to choose the directory;
 video recording requires the `video` extra.

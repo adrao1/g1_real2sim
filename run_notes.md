@@ -18,7 +18,7 @@ uv run --extra isaacsim python scripts/visualize_waypoints.py \
 # Save one fixed-camera PNG per recorded item pose, independent of the grasp.
 # The script prints a new directory under outputs/tracking_pose_screenshots/.
 uv run --extra isaacsim python scripts/screenshot_tracked_poses.py \
-  --tracking-config configs/tracking/cracker_box_d415_04.yml
+  --tracking-config configs/tracking/cracker_box_d415_05.yml
 
 # Save grasp-pose images at recording 03's first object pose. Omit --grasps
 # to render every grasp. The script prints its new output directory under
@@ -28,17 +28,17 @@ uv run --extra isaacsim python scripts/visualize_grasps.py \
   --tracking-config configs/tracking/cracker_box_d415_03.yml \
   --grasps 56 68 88
 
-# Approach and grasp the cracker box at recording 04's first pose in Kit.
-# The script stops after confirming sustained finger contact.
+# Grasp the cracker box at recording 05's first pose, lift it, and move it to
+# frame 86's full object pose. The fingers stay closed at the target.
 uv run --extra isaacsim python scripts/replay_tracked_pick_place.py \
-  --tracking-config configs/tracking/cracker_box_d415_04.yml \
-  --grasp-id 22 --viz kit
+  --tracking-config configs/tracking/cracker_box_d415_05.yml \
+  --grasp-id 22 --target-frame 86 --viz kit
 
-# Save the grasp-only run as an MP4 without a viewport.
-# The script prints the output path under outputs/tracked_grasps/.
+# Save the grasp and move as an MP4 without a viewport.
+# The script prints the output path under outputs/tracked_moves/.
 uv run --extra isaacsim --extra video python scripts/replay_tracked_pick_place.py \
-  --tracking-config configs/tracking/cracker_box_d415_04.yml \
-  --grasp-id 22 --record-video
+  --tracking-config configs/tracking/cracker_box_d415_05.yml \
+  --grasp-id 22 --target-frame 86 --record-video
 
 # Save one screenshot of the mustard-bottle scene without generating grasps.
 uv run --extra isaacsim python scripts/screenshot_scene.py \
