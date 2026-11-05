@@ -1,39 +1,58 @@
-"""Move 100 G1 wrists to different grasp poses and save one image per grasp."""
+"""Move G1 wrists to grasp poses and save one image per grasp."""
 
 import argparse
 import tempfile
 import xml.etree.ElementTree as ET
+from datetime import UTC, datetime
 from pathlib import Path
+from uuid import uuid4
 
-import yaml
+from evaluate_contact_grasps import DEFAULT_GRASPS, configure_item, configure_tracked_item, load_grasps
 
 from isaaclab.app import add_launcher_args, launch_simulation
 from isaaclab.sensors.camera import CameraCfg
 from isaaclab.sim import PinholeCameraCfg, UsdPhysicsCollisionCfg, UsdPhysicsRigidBodyCfg
 from isaaclab_physx.sim.schemas import PhysxRigidBodyCfg
 
-from g1_real2sim.assets import G1_REAL2SIM_ASSETS_DIR
 from g1_real2sim.tasks.pick_place.config.g1.env_cfg import PickPlaceEnvCfg
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     add_launcher_args(parser)
-    parser.add_argument("--output-dir", type=Path, default=Path("outputs"))
+    parser.add_argument("--output-dir", type=Path, help="Image directory; defaults to a new directory for each run")
+    parser.add_argument("--tracking-config", type=Path, help="Place the item at the recording's first world pose")
+    parser.add_argument("--grasp-file", type=Path, help="Isaac grasp YAML; defaults to the item's grasp file")
+    parser.add_argument("--grasps", nargs="+", type=int, metavar="ID", help="Grasp IDs to visualize; default is all")
     parser.set_defaults(device="cpu")
     args = parser.parse_args()
 
-    grasp_file = G1_REAL2SIM_ASSETS_DIR / "grasps/cracker_box_grasps.yml"
-    with grasp_file.open() as file:
-        grasp_data = yaml.safe_load(file)["grasps"]
-    if len(grasp_data) != 100:
-        raise ValueError(f"Expected 100 grasps, found {len(grasp_data)}")
-    grasps = [grasp_data[f"grasp_{index}"] for index in range(100)]
-
     cfg = PickPlaceEnvCfg()
+    try:
+        if args.tracking_config is None:
+            item = configure_item(cfg, argparse.Namespace(item_config=None, item_position=None, item_rotation=None))
+        else:
+            item, first_frame = configure_tracked_item(cfg, args.tracking_config)
+            print(f"Tracking frame {first_frame}; item pose: {item.position}, {item.rotation_xyzw}", flush=True)
+        grasp_file = args.grasp_file or item.grasp_file or (DEFAULT_GRASPS if item.name == "cracker_box" else None)
+        if grasp_file is None:
+            raise ValueError(f"Provide --grasp-file for {item.name}")
+        grasp_file = grasp_file.expanduser().resolve(strict=True)
+        grasps = load_grasps(grasp_file)
+        grasp_ids = args.grasps if args.grasps is not None else list(grasps)
+        if not grasp_ids or len(set(grasp_ids)) != len(grasp_ids) or any(index not in grasps for index in grasp_ids):
+            raise ValueError("Select distinct grasp IDs present in the selected grasp YAML")
+        if args.output_dir is None:
+            source = args.tracking_config.stem if args.tracking_config is not None else f"{item.name}_preset"
+            run_name = f"{datetime.now(UTC):%Y%m%dT%H%M%SZ}_{uuid4().hex[:8]}"
+            args.output_dir = Path("outputs/grasp_visualization") / source / run_name
+    except (OSError, ValueError) as exc:
+        parser.error(str(exc))
+    print(f"Grasp images: {args.output_dir}", flush=True)
+
     cfg.sim.device = args.device
     cfg.sim.render_interval = cfg.decimation
-    cfg.scene.num_envs = len(grasps)
+    cfg.scene.num_envs = len(grasp_ids)
     cfg.scene.object.spawn.collision_props = UsdPhysicsCollisionCfg(collision_enabled=False)
     cfg.scene.object.spawn.rigid_props = [
         UsdPhysicsRigidBodyCfg(kinematic_enabled=False),
@@ -80,9 +99,10 @@ def main() -> None:
             robot = env.scene["robot"]
             camera = env.scene["camera"]
             origins = env.scene.env_origins
+            focus = torch.tensor(item.position, device=env.device) + torch.tensor((0.0, 0.0, -0.02), device=env.device)
             camera.set_world_poses_from_view(
-                origins + torch.tensor((1.2, 1.2, 1.5), device=env.device),
-                origins + torch.tensor((0.0, 0.4, 0.85), device=env.device),
+                origins + focus + torch.tensor((1.2, 0.8, 0.65), device=env.device),
+                origins + focus,
             )
             wrist_ids = [robot.body_names.index(name) for name in ("left_wrist_yaw_link", "right_wrist_yaw_link")]
             wrist_poses = robot.data.body_link_pose_w.torch[:, wrist_ids].clone()
@@ -95,10 +115,10 @@ def main() -> None:
 
             object_pose = env.scene["object"].data.root_link_pose_w.torch
             grasp_pos = torch.tensor(
-                [grasp["position"] for grasp in grasps], device=env.device, dtype=object_pose.dtype
+                [grasps[index]["position"] for index in grasp_ids], device=env.device, dtype=object_pose.dtype
             )
             grasp_quat = torch.tensor(
-                [[*grasp["orientation"]["xyz"], grasp["orientation"]["w"]] for grasp in grasps],
+                [grasps[index]["quaternion_xyzw"] for index in grasp_ids],
                 device=env.device,
                 dtype=object_pose.dtype,
             )
@@ -107,14 +127,14 @@ def main() -> None:
             )
 
             # GraspGenX unitree_g1/gripper.urdf: world_joint -> right_palm_link.
-            root_to_palm_pos = torch.tensor(
-                [[0.07, 0.0, 0.02]], device=env.device, dtype=object_pose.dtype
-            ).expand(len(grasps), -1)
+            root_to_palm_pos = torch.tensor([[0.07, 0.0, 0.02]], device=env.device, dtype=object_pose.dtype).expand(
+                len(grasp_ids), -1
+            )
             root_to_palm_quat = quat_from_euler_xyz(
                 torch.tensor([1.5708], device=env.device),
                 torch.tensor([0.0], device=env.device),
                 torch.tensor([3.14159], device=env.device),
-            ).expand(len(grasps), -1)
+            ).expand(len(grasp_ids), -1)
             palm_pos_w, palm_quat_w = combine_frame_transforms(
                 grasp_pos_w, grasp_quat_w, root_to_palm_pos, root_to_palm_quat
             )
@@ -142,12 +162,9 @@ def main() -> None:
                     fraction = (step + 1) / 100
                     action[:, 7:10] = start_pos + fraction * (target_pos - start_pos)
                     slerp_quat = (
-                        torch.sin((1 - fraction) * angle) * start_quat
-                        + torch.sin(fraction * angle) * end_quat
+                        torch.sin((1 - fraction) * angle) * start_quat + torch.sin(fraction * angle) * end_quat
                     ) / sin_angle.clamp_min(1e-6)
-                    lerp_quat = torch.nn.functional.normalize(
-                        (1 - fraction) * start_quat + fraction * end_quat, dim=-1
-                    )
+                    lerp_quat = torch.nn.functional.normalize((1 - fraction) * start_quat + fraction * end_quat, dim=-1)
                     action[:, 10:14] = torch.where(sin_angle > 1e-6, slerp_quat, lerp_quat)
                     env.step(action)
                     if (step + 1) % 25 == 0:
@@ -162,12 +179,12 @@ def main() -> None:
             print("Capturing camera images...", flush=True)
             images = camera.data.output["rgb"].torch
             args.output_dir.mkdir(parents=True, exist_ok=True)
-            for index in range(len(grasps)):
-                image_path = args.output_dir / f"grasp_{index}.png"
-                save_images_to_file(images[index : index + 1].float() / 255.0, str(image_path))
+            for slot, grasp_id in enumerate(grasp_ids):
+                image_path = args.output_dir / f"grasp_{grasp_id}.png"
+                save_images_to_file(images[slot : slot + 1].float() / 255.0, str(image_path))
                 print(
-                    f"grasp_{index} wrist error: {position_errors[index].item():.4f} m, "
-                    f"{rotation_errors[index].item():.1f} deg; saved {image_path}"
+                    f"grasp_{grasp_id} wrist error: {position_errors[slot].item():.4f} m, "
+                    f"{rotation_errors[slot].item():.1f} deg; saved {image_path}"
                 )
         finally:
             env.close()

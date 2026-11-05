@@ -15,6 +15,14 @@ uv run --extra isaacsim isaaclab zero_agent \
 uv run --extra isaacsim python scripts/visualize_waypoints.py \
   --tracking-config configs/tracking/cracker_box_d415_01.yml
 
+# Save grasp-pose images at recording 03's first object pose. Omit --grasps
+# to render every grasp. The script prints its new output directory under
+# outputs/grasp_visualization/cracker_box_d415_03/. These images show final
+# wrist poses, not grasp outcomes.
+uv run --extra isaacsim python scripts/visualize_grasps.py \
+  --tracking-config configs/tracking/cracker_box_d415_03.yml \
+  --grasps 56 68 88
+
 # Pick the cracker box with grasp 22, follow its tracked 6D motion, then
 # release at the final tracked pose. Set --tracking-fps to the recording's FPS.
 uv run --extra isaacsim python scripts/replay_tracked_pick_place.py \
@@ -51,6 +59,12 @@ uv run --extra isaacsim python scripts/evaluate_contact_grasps.py \
 uv run --extra isaacsim python scripts/evaluate_contact_grasps.py \
   --tracking-config configs/tracking/cracker_box_d415_03.yml \
   --no-video --batch-size 100
+
+# Watch one chosen grasp attempt for recording 03 in the Kit viewport.
+# Replace 56 with the grasp ID you want to inspect.
+uv run --extra isaacsim python scripts/evaluate_contact_grasps.py \
+  --tracking-config configs/tracking/cracker_box_d415_03.yml \
+  --grasps 56 --batch-size 1 --no-video --viz kit
 
 # Recheck successful grasps from that run with video before choosing an ID.
 # Replace SCREENING_RUN with the directory printed by the screening command.
