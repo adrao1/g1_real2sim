@@ -35,3 +35,16 @@ the script plots the raw camera-frame translations instead.
 
 The blue camera marker uses the translation column of `world_from_camera`.
 When the matrix is `null`, the marker is omitted.
+
+`scripts/replay_tracked_pick_place.py` requires `world_from_camera` and uses
+each full object pose, including its rotation. It initializes the simulated
+item at the first tracked pose, picks it with an object-relative grasp, and
+converts the remaining object poses to wrist targets using the measured grip.
+The recorded motion supplies the lift, transport, and lowering phases; the
+script opens the hand at the final pose. Pass the source video's actual frame
+rate with `--tracking-fps`. The current cracker-box camera rotation is still
+an estimate, so this replay should be treated as a simulation smoke test until
+that rotation is calibrated.
+Pass `--record-video` to save the full replay as one MP4 in a new directory
+under `outputs/tracking_replays/`. Use `--video-dir` to choose the directory;
+video recording requires the `video` extra.
