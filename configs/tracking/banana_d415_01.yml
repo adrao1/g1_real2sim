@@ -1,18 +1,11 @@
 name: banana_d415_01
+# Coordinate frames and measurement reference: README.md in this directory.
 item_config: ../items/banana.yml
 pose_dir: ../../../FoundationPose/debug_banana/ob_in_cam
-
-# Estimated camera optical center in simulator world coordinates (meters),
-# assuming the measurements were taken to the camera's optical center.
-# X: 0.33 m right of table center; Y: 0.587 m behind the near edge
-# (near edge at 0.55 - 0.401 = 0.149); Z: 0.404 m above the 0.758 m tabletop.
-camera_position_world: [0.330, -0.438, 1.162]
 
 # Each pose file is T_camera_foundation_mesh in OpenCV camera coordinates.
 # The waypoint screenshot uses the translation column directly as world XYZ.
 # That raw view does not align the points with the simulated item.
-# To place the simulated item: T_world_item =
-#   T_world_camera @ T_camera_foundation_mesh @ T_foundation_mesh_item.
-# Fill these when calibration and mesh-to-USD alignment are known.
+# This recording used a different banana mesh. Rerun FoundationPose with the
+# exported banana tracking OBJ before using the camera transform for alignment.
 world_from_camera: null
-foundation_mesh_from_item: null

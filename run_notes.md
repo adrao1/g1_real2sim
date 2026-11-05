@@ -1,19 +1,21 @@
 # G1 tabletop grasp runs
 
 Run commands from this repository root.
+See `configs/tracking/README.md` for the camera and world frame conventions.
 
 ```bash
 # Inspect the registered scene in a viewport.
 uv run --extra isaacsim isaaclab zero_agent \
   --task G1Real2sim-PickPlace-G1 --num_envs 1 --device cpu --viz kit
 
-# Save a screenshot with raw FoundationPose waypoints (magenta) and the
-# estimated camera position from the tracking config (blue).
+# Save raw banana FoundationPose waypoints (magenta); this config has no
+# world_from_camera, so it does not show a camera-position marker.
 uv run --extra isaacsim python scripts/visualize_waypoints.py \
   --tracking-config configs/tracking/banana_d415_01.yml
 
 # After tracking the cracker box with assets/ycb/cracker_box/tracking/textured.obj
-# and --debug_dir debug_cracker_box, view approximately world-aligned waypoints.
+# and --debug_dir debug_cracker_box, view approximately world-aligned waypoints
+# (magenta) and the camera position from world_from_camera (blue).
 uv run --extra isaacsim python scripts/visualize_waypoints.py \
   --tracking-config configs/tracking/cracker_box_d415_01.yml
 

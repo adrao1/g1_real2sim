@@ -47,25 +47,8 @@ def load_waypoints(
     if not isinstance(tracking.get("item_config"), str) or not isinstance(tracking.get("pose_dir"), str):
         raise ValueError("Tracking config needs item_config and pose_dir paths")
     world_from_camera = _matrix(tracking.get("world_from_camera"), "world_from_camera")
-    foundation_mesh_from_item = _matrix(tracking.get("foundation_mesh_from_item"), "foundation_mesh_from_item")
-    if (world_from_camera is None) != (foundation_mesh_from_item is None):
-        raise ValueError("world_from_camera and foundation_mesh_from_item must both be set or both be null")
     aligned = world_from_camera is not None
-    camera_position = tracking.get("camera_position_world")
-    if camera_position is not None:
-        if (
-            not isinstance(camera_position, list)
-            or len(camera_position) != 3
-            or any(isinstance(value, bool) or not isinstance(value, (int, float)) for value in camera_position)
-            or not np.isfinite(camera_position).all()
-        ):
-            raise ValueError("camera_position_world must be three finite XYZ numbers")
-        camera_position = tuple(float(value) for value in camera_position)
-    if aligned:
-        matrix_position = tuple(float(value) for value in world_from_camera[:3, 3])
-        if camera_position is not None and not np.allclose(camera_position, matrix_position, atol=1e-3):
-            raise ValueError("camera_position_world must match the translation in world_from_camera")
-        camera_position = matrix_position
+    camera_position = tuple(float(value) for value in world_from_camera[:3, 3]) if aligned else None
     item_path = (path.parent / tracking["item_config"]).resolve(strict=True)
     pose_dir = (path.parent / tracking["pose_dir"]).resolve(strict=True)
     if not pose_dir.is_dir():
@@ -79,7 +62,7 @@ def load_waypoints(
         if pose.shape != (4, 4) or not np.isfinite(pose).all() or not np.allclose(pose[3], (0, 0, 0, 1)):
             raise ValueError(f"Invalid 4x4 pose: {file}")
         if aligned:
-            pose = world_from_camera @ pose @ foundation_mesh_from_item
+            pose = world_from_camera @ pose
         waypoints.append((file.stem, tuple(float(value) for value in pose[:3, 3])))
     return item_path, waypoints, camera_position, aligned
 
