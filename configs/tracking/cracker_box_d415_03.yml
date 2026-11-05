@@ -1,0 +1,12 @@
+name: cracker_box_d415_03
+# Coordinate frames and measurement reference: README.md in this directory.
+item_config: ../items/cracker_box.yml
+pose_dir: ../../../FoundationPose/debug_cracker_box_2/ob_in_cam
+
+# Reuses the camera pose from cracker_box_d415_01.yml. This is valid only if
+# the camera and table stayed fixed; the camera rotation is still an estimate.
+world_from_camera:
+  - [0.9305, 0.1130, -0.3485, 0.330]
+  - [0.3664, -0.2870, 0.8851, -0.438]
+  - [0.0000, -0.9513, -0.3084, 1.162]
+  - [0.0000, 0.0000, 0.0000, 1.000]
