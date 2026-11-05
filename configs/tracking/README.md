@@ -42,10 +42,10 @@ still an estimate; visualizing it does not calibrate it.
 the first full object pose, including its rotation, to initialize the simulated
 item and approach an object-relative grasp. It closes the fingers, checks for
 sustained thumb and opposing-finger contact, then measures the actual grip.
-It lifts the item to the selected frame's height, moves it to that frame's full
-world pose, and holds the grasp. Choose the destination with `--target-frame`
-(default 86). The move is time-scaled independently of the recording's frame
-rate; the script does not release the item.
+It transitions from the held pose to the recording's first pose, follows every
+recorded 6D pose in order, then opens the hand at the final pose and withdraws.
+Set `--tracking-fps` to the source frame rate. `--playback-speed` controls the
+replay rate relative to the recording and defaults to 0.5 for slower motion.
 To choose a grasp for a recording, run `scripts/evaluate_contact_grasps.py`
 with `--tracking-config` pointing to this YAML. It places the item at the
 first tracked world pose and runs the existing approach, closure, and lift
@@ -55,6 +55,6 @@ default, so a selected `grasp_id` can be passed to replay. If you supply
 `--grasp-file` to either script, use the same file in both.
 The current cracker-box camera rotation is still an estimate, so the poses
 should be treated as a simulation smoke test until that rotation is calibrated.
-Pass `--record-video` to save the grasp and move as one MP4 in a new directory
-under `outputs/tracked_moves/`. Use `--video-dir` to choose the directory;
+Pass `--record-video` to save the full replay as one MP4 in a new directory
+under `outputs/tracking_replays/`. Use `--video-dir` to choose the directory;
 video recording requires the `video` extra.

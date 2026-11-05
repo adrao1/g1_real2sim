@@ -1,4 +1,4 @@
-"""Grasp an item, then lift and move it to one recorded FoundationPose frame."""
+"""Grasp an item, follow its recorded object trajectory, and release it."""
 
 from __future__ import annotations
 
@@ -11,6 +11,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from uuid import uuid4
 
+import numpy as np
 import torch
 from evaluate_contact_grasps import (
     DEFAULT_GRASPS,
@@ -36,9 +37,39 @@ APPROACH_STEPS = 100
 APPROACH_HOLD_STEPS = 50
 CLOSE_STEPS = 50
 CLOSE_HOLD_STEPS = 25
-TARGET_HOLD_STEPS = 50
+PLACE_HOLD_STEPS = 25
+OPEN_STEPS = 50
+RETREAT_STEPS = 75
+FINAL_HOLD_STEPS = 50
 GRASP_STEPS = sum((SETTLE_STEPS, APPROACH_STEPS, APPROACH_HOLD_STEPS, CLOSE_STEPS, CLOSE_HOLD_STEPS))
 CONTACT_LOSS_STEPS = 5
+
+
+def resample_poses(
+    poses: np.ndarray, frame_numbers: np.ndarray, tracking_fps: float, playback_speed: float, action_dt: float
+) -> tuple[np.ndarray, np.ndarray]:
+    """Interpolate the complete object path at the IK action rate."""
+    frame_times = (frame_numbers - frame_numbers[0]) / (tracking_fps * playback_speed)
+    action_times = np.arange(0.0, frame_times[-1], action_dt)
+    action_times = np.r_[action_times, frame_times[-1]]
+    positions = np.column_stack([np.interp(action_times, frame_times, poses[:, axis, 3]) for axis in range(3)])
+    source_quaternions = quat_from_matrix(torch.as_tensor(poses[:, :3, :3], dtype=torch.float64)).numpy()
+    left = np.clip(np.searchsorted(frame_times, action_times, side="right") - 1, 0, len(frame_times) - 2)
+    fraction = (action_times - frame_times[left]) / (frame_times[left + 1] - frame_times[left])
+    first = source_quaternions[left]
+    second = source_quaternions[left + 1].copy()
+    dot = np.sum(first * second, axis=1)
+    second[dot < 0] *= -1
+    angle = np.arccos(np.clip(np.abs(dot), 0.0, 1.0))
+    denominator = np.maximum(np.sin(angle), 1e-8)
+    interpolated = (
+        np.sin((1 - fraction) * angle)[:, None] * first + np.sin(fraction * angle)[:, None] * second
+    ) / denominator[:, None]
+    near_same = angle < 1e-4
+    near_fraction = fraction[near_same][:, None]
+    interpolated[near_same] = (1 - near_fraction) * first[near_same] + near_fraction * second[near_same]
+    interpolated /= np.linalg.norm(interpolated, axis=1, keepdims=True)
+    return positions, interpolated
 
 
 def prepare_ik_urdf(cfg: PickPlaceEnvCfg, directory: str) -> None:
@@ -70,7 +101,7 @@ def configure_video(cfg: PickPlaceEnvCfg, video_dir: Path, total_steps: int) -> 
         VideoRecorderCfg(
             source=ImageViewCfg(source="camera", envs=(0,)),
             output_dir=str(video_dir),
-            output_filename_prefix="move",
+            output_filename_prefix="replay",
             video_length=total_steps,
             video_interval=0,
             frame_stride=2,
@@ -79,8 +110,14 @@ def configure_video(cfg: PickPlaceEnvCfg, video_dir: Path, total_steps: int) -> 
     ]
 
 
-def run_grasp_and_move(
-    env, cfg: PickPlaceEnvCfg, grasp: dict, target_pose, args, lift_steps: int, move_steps: int
+def run_replay(
+    env,
+    cfg: PickPlaceEnvCfg,
+    grasp: dict,
+    positions: np.ndarray,
+    quaternions: np.ndarray,
+    args,
+    transition_steps: int,
 ) -> None:
     from isaaclab.utils.math import (
         combine_frame_transforms,
@@ -204,24 +241,21 @@ def run_grasp_and_move(
         )
         print(f"Grasp contacts established; item moved {item_shift:.3f} m since settling.", flush=True)
 
-        # The actual held pose determines the wrist offset. The target remains
-        # the absolute world pose recorded at the selected frame.
+        # Measure the held relationship once, after the fingers close.
         held_object = item.data.root_link_pose_w.torch.clone()
         held_wrist = robot.data.body_link_pose_w.torch[:, wrist_ids[1]].clone()
         object_to_wrist_pos, object_to_wrist_quat = subtract_frame_transforms(
             held_object[:, :3], held_object[:, 3:7], held_wrist[:, :3], held_wrist[:, 3:7]
         )
-        goal_pos = torch.as_tensor(target_pose[:3, 3], device=env.device, dtype=action.dtype).unsqueeze(0)
-        goal_quat = quat_from_matrix(
-            torch.as_tensor(target_pose[:3, :3], device=env.device, dtype=action.dtype)
-        ).unsqueeze(0)
+        recorded_start_pos = torch.as_tensor(positions[0], device=env.device, dtype=action.dtype).unsqueeze(0)
+        recorded_start_quat = torch.as_tensor(quaternions[0], device=env.device, dtype=action.dtype).unsqueeze(0)
         start_pos = held_object[:, :3].clone()
         start_quat = held_object[:, 3:7].clone()
-        requested_lift = float((goal_pos[0, 2] - start_pos[0, 2]).item())
-        if requested_lift < 0.02:
-            raise RuntimeError(f"Target must be at least 2 cm above the held object (rise {requested_lift:.3f} m)")
-        lift_pos = start_pos.clone()
-        lift_pos[:, 2] = goal_pos[:, 2]
+        initial_gap = float(torch.linalg.vector_norm(start_pos - recorded_start_pos, dim=-1).max().item())
+        initial_angle = float(torch.rad2deg(quat_error_magnitude(start_quat, recorded_start_quat)).max().item())
+        print(f"Transitioning to recorded start: {initial_gap:.3f} m, {initial_angle:.1f} deg.", flush=True)
+        if initial_gap > args.max_object_error_m or initial_angle > args.max_object_angle_deg:
+            raise RuntimeError("Grasp displaced the item too far from the recording's start pose")
         lost_contact_steps = 0
         max_position_error = 0.0
         max_angle_error = 0.0
@@ -249,39 +283,54 @@ def run_grasp_and_move(
                     f"Object departed from target during {stage}: {position_error:.3f} m, {angle_error:.1f} deg"
                 )
 
-        print(f"Lifting item {requested_lift:.3f} m...", flush=True)
-        for step in range(lift_steps):
-            fraction = (step + 1) / lift_steps
+        for step in range(transition_steps):
+            fraction = (step + 1) / transition_steps
             blend = fraction * fraction * (3 - 2 * fraction)
-            desired_pos = start_pos + blend * (lift_pos - start_pos)
-            move_step("lift", desired_pos, start_quat)
-        lift_error = float(
-            torch.linalg.vector_norm(item.data.root_link_pose_w.torch[:, :3] - lift_pos, dim=-1).max().item()
-        )
-        if lift_error > 0.03:
-            raise RuntimeError(f"Object did not follow the lift: {lift_error:.3f} m from lift target")
+            desired_pos = start_pos + blend * (recorded_start_pos - start_pos)
+            desired_quat = quat_slerp(start_quat[0], recorded_start_quat[0], blend).unsqueeze(0)
+            move_step("start transition", desired_pos, desired_quat)
 
-        print(f"Moving item to recorded frame {args.target_frame}...", flush=True)
-        for step in range(move_steps):
-            fraction = (step + 1) / move_steps
-            blend = fraction * fraction * (3 - 2 * fraction)
-            desired_pos = lift_pos + blend * (goal_pos - lift_pos)
-            desired_quat = quat_slerp(start_quat[0], goal_quat[0], blend).unsqueeze(0)
-            move_step("target move", desired_pos, desired_quat)
-        for _ in range(TARGET_HOLD_STEPS):
-            move_step("target hold", goal_pos, goal_quat)
+        print(f"Following {len(positions)} resampled object poses...", flush=True)
+        for index, (position, quaternion) in enumerate(zip(positions, quaternions, strict=True)):
+            desired_pos = torch.as_tensor(position, device=env.device, dtype=action.dtype).unsqueeze(0)
+            desired_quat = torch.as_tensor(quaternion, device=env.device, dtype=action.dtype).unsqueeze(0)
+            move_step(f"tracked pose {index}", desired_pos, desired_quat)
+
+        final_target_pos = torch.as_tensor(positions[-1], device=env.device, dtype=action.dtype).unsqueeze(0)
+        final_target_quat = torch.as_tensor(quaternions[-1], device=env.device, dtype=action.dtype).unsqueeze(0)
+        for _ in range(PLACE_HOLD_STEPS):
+            move_step("placement hold", final_target_pos, final_target_quat)
+        held_final_pose = item.data.root_link_pose_w.torch
+        held_error = float(torch.linalg.vector_norm(held_final_pose[:, :3] - final_target_pos, dim=-1).max().item())
+        held_angle = float(torch.rad2deg(quat_error_magnitude(held_final_pose[:, 3:7], final_target_quat)).max().item())
+        if held_error > args.max_place_error_m or held_angle > args.max_place_angle_deg:
+            raise RuntimeError(f"Object missed final pose before release: {held_error:.3f} m, {held_angle:.1f} deg")
+
+        print("Opening fingers and withdrawing hand...", flush=True)
+        closed_hand = action[:, 14:].clone()
+        for step in range(OPEN_STEPS):
+            fraction = (step + 1) / OPEN_STEPS
+            action[:, 14:] = closed_hand + fraction * (open_hand - closed_hand)
+            advance("finger opening")
+        retreat_start = action[:, 7:10].clone()
+        retreat_delta = torch.tensor([[0.0, -0.10, 0.08]], device=env.device, dtype=action.dtype)
+        for step in range(RETREAT_STEPS):
+            action[:, 7:10] = retreat_start + ((step + 1) / RETREAT_STEPS) * retreat_delta
+            advance("hand retreat")
+        for _ in range(FINAL_HOLD_STEPS):
+            advance("final settle")
 
         final_pose = item.data.root_link_pose_w.torch
-        final_error = float(torch.linalg.vector_norm(final_pose[:, :3] - goal_pos, dim=-1).max().item())
-        final_angle = float(torch.rad2deg(quat_error_magnitude(final_pose[:, 3:7], goal_quat)).max().item())
+        place_error = float(torch.linalg.vector_norm(final_pose[:, :3] - final_target_pos, dim=-1).max().item())
+        place_angle = float(torch.rad2deg(quat_error_magnitude(final_pose[:, 3:7], final_target_quat)).max().item())
         print(
-            f"Frame {args.target_frame}: final error {final_error:.3f} m, {final_angle:.1f} deg; "
-            f"maximum path error {max_position_error:.3f} m, {max_angle_error:.1f} deg",
+            f"Maximum path error: {max_position_error:.3f} m, {max_angle_error:.1f} deg; "
+            f"final placement error: {place_error:.3f} m, {place_angle:.1f} deg",
             flush=True,
         )
-        if final_error > 0.03 or final_angle > 15:
-            raise RuntimeError("Object did not reach the recorded target pose")
-        print(f"Target reached; held the grasp for {TARGET_HOLD_STEPS} steps without releasing.", flush=True)
+        if place_error > args.max_place_error_m or place_angle > args.max_place_angle_deg:
+            raise RuntimeError("Object was not left at the recorded final pose")
+        print("Recorded trajectory replay and release completed.", flush=True)
 
 
 def main() -> None:
@@ -290,27 +339,32 @@ def main() -> None:
     parser.add_argument("--tracking-config", required=True, type=Path)
     parser.add_argument("--grasp-file", type=Path, help="Isaac grasp YAML; defaults to the cracker-box grasps")
     parser.add_argument("--grasp-id", type=int, default=22, help="Grasp ID tested by the contact evaluator")
-    parser.add_argument("--target-frame", type=int, default=86, help="Recorded object pose to reach; default 86")
-    parser.add_argument("--lift-duration-s", type=float, default=2.0)
-    parser.add_argument("--move-duration-s", type=float, default=3.0)
+    parser.add_argument("--tracking-fps", type=float, default=30.0, help="Frame rate of the source recording")
+    parser.add_argument("--playback-speed", type=float, default=0.5, help="Trajectory speed relative to the recording")
+    parser.add_argument("--transition-duration-s", type=float, default=1.0)
     parser.add_argument("--contact-threshold-n", type=float, default=0.5)
     parser.add_argument("--max-object-error-m", type=float, default=0.05)
     parser.add_argument("--max-object-angle-deg", type=float, default=25.0)
-    parser.add_argument("--record-video", action="store_true", help="Save an MP4 of the grasp and move")
+    parser.add_argument("--max-place-error-m", type=float, default=0.05)
+    parser.add_argument("--max-place-angle-deg", type=float, default=25.0)
+    parser.add_argument("--record-video", action="store_true", help="Save an MP4 of the full replay")
     parser.add_argument("--video-dir", type=Path, help="MP4 directory; implies --record-video")
     parser.set_defaults(device="cpu")
     args = parser.parse_args()
     if any(
         not math.isfinite(value) or value <= 0
         for value in (
-            args.lift_duration_s,
-            args.move_duration_s,
+            args.tracking_fps,
+            args.playback_speed,
+            args.transition_duration_s,
             args.contact_threshold_n,
             args.max_object_error_m,
             args.max_object_angle_deg,
+            args.max_place_error_m,
+            args.max_place_angle_deg,
         )
     ):
-        parser.error("Durations, contact threshold, and object error limits must be positive")
+        parser.error("FPS, speed, transition duration, contact threshold, and error limits must be positive")
     if (args.record_video or args.video_dir is not None) and importlib.util.find_spec("moviepy") is None:
         parser.error("Video recording requires: uv run --extra isaacsim --extra video ...")
 
@@ -333,17 +387,23 @@ def main() -> None:
         grasps = load_grasps(grasp_file)
         if args.grasp_id not in grasps:
             raise ValueError(f"Grasp {args.grasp_id} is missing from {grasp_file}")
-        target_indices = [index for index, frame in enumerate(frame_numbers) if int(frame) == args.target_frame]
-        if not target_indices:
-            raise ValueError(f"Frame {args.target_frame} is missing from {args.tracking_config}")
-        target_pose = tracked_poses[target_indices[0]]
+        action_dt = cfg.sim.dt * cfg.decimation
+        positions, quaternions = resample_poses(
+            tracked_poses, frame_numbers, args.tracking_fps, args.playback_speed, action_dt
+        )
     except (OSError, ValueError) as exc:
         parser.error(str(exc))
 
-    action_dt = cfg.sim.dt * cfg.decimation
-    lift_steps = max(1, round(args.lift_duration_s / action_dt))
-    move_steps = max(1, round(args.move_duration_s / action_dt))
-    total_steps = GRASP_STEPS + lift_steps + move_steps + TARGET_HOLD_STEPS
+    transition_steps = max(1, round(args.transition_duration_s / action_dt))
+    total_steps = (
+        GRASP_STEPS
+        + transition_steps
+        + len(positions)
+        + PLACE_HOLD_STEPS
+        + OPEN_STEPS
+        + RETREAT_STEPS
+        + FINAL_HOLD_STEPS
+    )
     cfg.scene.num_envs = 1
     cfg.sim.device = args.device
     cfg.sim.render_interval = cfg.decimation
@@ -351,7 +411,7 @@ def main() -> None:
     configure_contact_sensors(cfg)
     video_dir = None
     if args.record_video or args.video_dir is not None:
-        video_dir = args.video_dir or Path("outputs/tracked_moves") / (
+        video_dir = args.video_dir or Path("outputs/tracking_replays") / (
             f"{args.tracking_config.stem}_{datetime.now(UTC):%Y%m%dT%H%M%SZ}_{uuid4().hex[:8]}"
         )
         video_dir = video_dir.expanduser().resolve()
@@ -359,8 +419,8 @@ def main() -> None:
         configure_video(cfg, video_dir, total_steps)
 
     print(
-        f"Item: {item.name}; first frame: {int(frame_numbers[0])}; target frame: {args.target_frame}; "
-        f"grasp: {args.grasp_id}; grasp file: {grasp_file}",
+        f"Item: {item.name}; frames: {len(frame_numbers)}; action targets: {len(positions)}; "
+        f"grasp: {args.grasp_id}; playback speed: {args.playback_speed:g}x; grasp file: {grasp_file}",
         flush=True,
     )
     with launch_simulation(cfg, args), tempfile.TemporaryDirectory(prefix="g1_grasp_urdf_") as urdf_dir:
@@ -371,21 +431,21 @@ def main() -> None:
         try:
             env.reset()
             if video_dir is not None:
-                focus_position = (tracked_poses[0, :3, 3] + target_pose[:3, 3]) / 2
+                focus_position = (positions.min(axis=0) + positions.max(axis=0)) / 2
                 focus = torch.as_tensor(focus_position, device=env.device, dtype=torch.float32)
                 origin = env.scene.env_origins
                 env.scene["camera"].set_world_poses_from_view(
                     origin + focus + torch.tensor((0.9, 0.9, 0.65), device=env.device),
                     origin + focus,
                 )
-            run_grasp_and_move(env, cfg, grasps[args.grasp_id], target_pose, args, lift_steps, move_steps)
+            run_replay(env, cfg, grasps[args.grasp_id], positions, quaternions, args, transition_steps)
         finally:
             env.close()
         if video_dir is not None:
-            clips = sorted(video_dir.glob("move_*.mp4"))
+            clips = sorted(video_dir.glob("replay_*.mp4"))
             if not clips:
-                raise RuntimeError(f"Move completed but no MP4 was saved in {video_dir}")
-            print(f"Move video: {clips[-1]}", flush=True)
+                raise RuntimeError(f"Replay completed but no MP4 was saved in {video_dir}")
+            print(f"Replay video: {clips[-1]}", flush=True)
 
 
 if __name__ == "__main__":
