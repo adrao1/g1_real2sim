@@ -1,0 +1,10 @@
+name: banana_d415_01
+item_config: ../items/banana.yml
+pose_dir: ../../../FoundationPose/debug_banana/ob_in_cam
+
+# Each pose file is T_camera_foundation_mesh in OpenCV camera coordinates.
+# To place the simulated item: T_world_item =
+#   T_world_camera @ T_camera_foundation_mesh @ T_foundation_mesh_item.
+# Fill these only after the camera extrinsic and mesh-to-USD alignment are known.
+world_from_camera: null
+foundation_mesh_from_item: null
