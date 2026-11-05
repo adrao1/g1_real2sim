@@ -1,5 +1,5 @@
 name: mustard_bottle
-usd_path: /home/aditya/isaac_ycb_assets/https/omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/6.2/Isaac/Props/YCB/Axis_Aligned_Physics/006_mustard_bottle.usd
+usd_path: ../../assets/ycb/mustard_bottle/Axis_Aligned_Physics/006_mustard_bottle.usd
 scale: 1.0
 position: [0.0, 0.40, 0.87]
 rotation_xyzw: [-0.7071068, 0.0, 0.0, 0.7071068]

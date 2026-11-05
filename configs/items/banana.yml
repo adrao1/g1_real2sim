@@ -1,0 +1,5 @@
+name: banana
+usd_path: ../../assets/ycb/banana/banana.usd
+scale: 1.0
+position: [0.0, 0.40, 0.80]
+rotation_xyzw: [0.0, 0.0, 0.0, 1.0]
