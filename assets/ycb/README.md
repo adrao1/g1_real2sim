@@ -34,9 +34,7 @@ The exporter selects each textured visual mesh, applies its transform relative
 to the USD's object root, triangulates it, and writes its UVs and texture. In
 particular, the mustard and cracker USDs scale their visual meshes by 0.01;
 the OBJ vertices are exported in meters in the object-root frame. The OBJ
-coordinates are suitable for matching a *new* FoundationPose run against the
-corresponding simulator USD. The poses in `configs/tracking/banana_d415_01.yml`
-were produced with a different banana mesh and are not automatically aligned
-with this export.
+coordinates are suitable for matching a FoundationPose run against the
+corresponding simulator USD. Tracking poses must use the matching exported mesh.
 
 Grasp YAMLs must match the specific USD and scale used for evaluation.

@@ -34,6 +34,4 @@ itself validate the item's orientation. When `world_from_camera` is `null`,
 the script plots the raw camera-frame translations instead.
 
 The blue camera marker uses the translation column of `world_from_camera`.
-When the matrix is `null`, the marker is omitted. The old banana pose sequence
-used a different mesh, so it remains in the raw view until FoundationPose is
-rerun with `assets/ycb/banana/tracking/textured.obj`.
+When the matrix is `null`, the marker is omitted.
