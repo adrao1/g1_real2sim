@@ -13,7 +13,12 @@ uv run --extra isaacsim isaaclab zero_agent \
 # (cyan to orange, green start, red end), sampled XYZ orientation arrows
 # (red X, green Y, blue Z), and the estimated camera pose (blue sphere + axes).
 uv run --extra isaacsim python scripts/visualize_waypoints.py \
-  --tracking-config configs/tracking/cracker_box_d415_01.yml
+  --tracking-config configs/tracking/cracker_box_d415_04.yml
+
+# Save one fixed-camera PNG per recorded item pose, independent of the grasp.
+# The script prints a new directory under outputs/tracking_pose_screenshots/.
+uv run --extra isaacsim python scripts/screenshot_tracked_poses.py \
+  --tracking-config configs/tracking/cracker_box_d415_04.yml
 
 # Save grasp-pose images at recording 03's first object pose. Omit --grasps
 # to render every grasp. The script prints its new output directory under
@@ -26,13 +31,13 @@ uv run --extra isaacsim python scripts/visualize_grasps.py \
 # Pick the cracker box with grasp 22, follow its tracked 6D motion, then
 # release at the final tracked pose. Set --tracking-fps to the recording's FPS.
 uv run --extra isaacsim python scripts/replay_tracked_pick_place.py \
-  --tracking-config configs/tracking/cracker_box_d415_01.yml \
+  --tracking-config configs/tracking/cracker_box_d415_04.yml \
   --grasp-id 22 --tracking-fps 30 --viz kit
 
 # Save the full pick, carry, and place replay as an MP4 without a viewport.
 # The script prints the output path under outputs/tracking_replays/.
 uv run --extra isaacsim --extra video python scripts/replay_tracked_pick_place.py \
-  --tracking-config configs/tracking/cracker_box_d415_01.yml \
+  --tracking-config configs/tracking/cracker_box_d415_04.yml \
   --grasp-id 22 --tracking-fps 30 --record-video
 
 # Save one screenshot of the mustard-bottle scene without generating grasps.
