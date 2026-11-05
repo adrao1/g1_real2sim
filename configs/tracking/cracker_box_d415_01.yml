@@ -1,0 +1,20 @@
+name: cracker_box_d415_01
+item_config: ../items/cracker_box.yml
+pose_dir: ../../../FoundationPose/debug_cracker_box/ob_in_cam
+
+# Use assets/ycb/cracker_box/tracking/textured.obj for the FoundationPose run.
+# Camera position is measured; rotation is an initial look-at guess aimed at
+# the simulated item's starting position [0.0, 0.40, 0.87], with zero roll.
+camera_position_world: [0.330, -0.438, 1.162]
+world_from_camera:
+  - [0.9305, 0.1130, -0.3485, 0.330]
+  - [0.3664, -0.2870, 0.8851, -0.438]
+  - [0.0000, -0.9513, -0.3084, 1.162]
+  - [0.0000, 0.0000, 0.0000, 1.000]
+
+# The tracking OBJ was exported in the same object-root frame as the USD.
+foundation_mesh_from_item:
+  - [1, 0, 0, 0]
+  - [0, 1, 0, 0]
+  - [0, 0, 1, 0]
+  - [0, 0, 0, 1]

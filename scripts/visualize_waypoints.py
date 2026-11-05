@@ -1,4 +1,4 @@
-"""Save a screenshot of raw FoundationPose positions and the estimated camera location."""
+"""Save a screenshot of FoundationPose waypoints and the estimated camera location."""
 
 from __future__ import annotations
 
@@ -18,10 +18,27 @@ from isaaclab.sim import PinholeCameraCfg, PreviewSurfaceCfg, SphereCfg
 from g1_real2sim.tasks.pick_place.config.g1.env_cfg import PickPlaceEnvCfg
 
 
+def _matrix(value: object, label: str) -> np.ndarray | None:
+    """Read an optional homogeneous transform from a tracking config."""
+    if value is None:
+        return None
+    if (
+        not isinstance(value, list)
+        or len(value) != 4
+        or any(not isinstance(row, list) or len(row) != 4 for row in value)
+        or any(isinstance(entry, bool) or not isinstance(entry, (int, float)) for row in value for entry in row)
+    ):
+        raise ValueError(f"{label} must be a 4x4 matrix of numbers")
+    matrix = np.asarray(value, dtype=float)
+    if not np.isfinite(matrix).all() or not np.allclose(matrix[3], (0, 0, 0, 1)):
+        raise ValueError(f"{label} must be a finite homogeneous transform")
+    return matrix
+
+
 def load_waypoints(
     path: Path,
-) -> tuple[Path, list[tuple[str, tuple[float, float, float]]], tuple[float, float, float] | None]:
-    """Read raw FoundationPose translations and an optional world camera position."""
+) -> tuple[Path, list[tuple[str, tuple[float, float, float]]], tuple[float, float, float] | None, bool]:
+    """Read FoundationPose poses, transforming them to world XYZ when calibrated."""
     path = path.expanduser().resolve(strict=True)
     with path.open() as file:
         tracking = yaml.safe_load(file)
@@ -29,6 +46,11 @@ def load_waypoints(
         raise ValueError(f"Tracking config must be a mapping: {path}")
     if not isinstance(tracking.get("item_config"), str) or not isinstance(tracking.get("pose_dir"), str):
         raise ValueError("Tracking config needs item_config and pose_dir paths")
+    world_from_camera = _matrix(tracking.get("world_from_camera"), "world_from_camera")
+    foundation_mesh_from_item = _matrix(tracking.get("foundation_mesh_from_item"), "foundation_mesh_from_item")
+    if (world_from_camera is None) != (foundation_mesh_from_item is None):
+        raise ValueError("world_from_camera and foundation_mesh_from_item must both be set or both be null")
+    aligned = world_from_camera is not None
     camera_position = tracking.get("camera_position_world")
     if camera_position is not None:
         if (
@@ -39,6 +61,11 @@ def load_waypoints(
         ):
             raise ValueError("camera_position_world must be three finite XYZ numbers")
         camera_position = tuple(float(value) for value in camera_position)
+    if aligned:
+        matrix_position = tuple(float(value) for value in world_from_camera[:3, 3])
+        if camera_position is not None and not np.allclose(camera_position, matrix_position, atol=1e-3):
+            raise ValueError("camera_position_world must match the translation in world_from_camera")
+        camera_position = matrix_position
     item_path = (path.parent / tracking["item_config"]).resolve(strict=True)
     pose_dir = (path.parent / tracking["pose_dir"]).resolve(strict=True)
     if not pose_dir.is_dir():
@@ -51,8 +78,10 @@ def load_waypoints(
         pose = np.loadtxt(file)
         if pose.shape != (4, 4) or not np.isfinite(pose).all() or not np.allclose(pose[3], (0, 0, 0, 1)):
             raise ValueError(f"Invalid 4x4 pose: {file}")
+        if aligned:
+            pose = world_from_camera @ pose @ foundation_mesh_from_item
         waypoints.append((file.stem, tuple(float(value) for value in pose[:3, 3])))
-    return item_path, waypoints, camera_position
+    return item_path, waypoints, camera_position, aligned
 
 
 def main() -> None:
@@ -67,7 +96,7 @@ def main() -> None:
 
     cfg = PickPlaceEnvCfg()
     try:
-        item_path, waypoints, camera_position = load_waypoints(args.tracking_config)
+        item_path, waypoints, camera_position, aligned = load_waypoints(args.tracking_config)
         item_args = argparse.Namespace(item_config=item_path, item_position=None, item_rotation=None)
         item = configure_item(cfg, item_args)
     except (OSError, ValueError) as exc:
@@ -128,7 +157,8 @@ def main() -> None:
 
         output.parent.mkdir(parents=True, exist_ok=True)
         save_images_to_file(camera.data.output["rgb"].torch.float() / 255.0, str(output))
-        print(f"Saved {len(waypoints)} raw camera-frame waypoints to {output.resolve()}", flush=True)
+        frame = "world-frame" if aligned else "raw camera-frame"
+        print(f"Saved {len(waypoints)} {frame} waypoints to {output.resolve()}", flush=True)
         if camera_position is not None:
             print(f"Blue camera-position marker: {camera_position}", flush=True)
 

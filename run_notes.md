@@ -12,6 +12,11 @@ uv run --extra isaacsim isaaclab zero_agent \
 uv run --extra isaacsim python scripts/visualize_waypoints.py \
   --tracking-config configs/tracking/banana_d415_01.yml
 
+# After tracking the cracker box with assets/ycb/cracker_box/tracking/textured.obj
+# and --debug_dir debug_cracker_box, view approximately world-aligned waypoints.
+uv run --extra isaacsim python scripts/visualize_waypoints.py \
+  --tracking-config configs/tracking/cracker_box_d415_01.yml
+
 # Save one screenshot of the mustard-bottle scene without generating grasps.
 uv run --extra isaacsim python scripts/screenshot_scene.py \
   --item-config configs/items/mustard_bottle.yml
