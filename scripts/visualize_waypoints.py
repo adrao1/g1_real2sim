@@ -102,20 +102,65 @@ def main() -> None:
 
     with launch_simulation(cfg, args):
         import torch
+        from pxr import Gf, UsdGeom
 
         from isaaclab.scene import InteractiveScene
         from isaaclab.sensors.camera.utils import save_images_to_file
-        from isaaclab.sim import SimulationContext, create_prim, spawn_sphere
+        from isaaclab.sim import SimulationContext, create_prim, get_current_stage, spawn_sphere
 
         sim = SimulationContext(cfg.sim)
         scene = InteractiveScene(cfg.scene)
         create_prim("/World/Waypoints", prim_type="Xform")
-        marker = SphereCfg(radius=0.02, visual_material=PreviewSurfaceCfg(diffuse_color=(1.0, 0.0, 1.0)))
-        for frame_id, position in waypoints:
-            spawn_sphere(f"/World/Waypoints/Frame_{frame_id}", marker, translation=position)
+        positions = [position for _, position in waypoints]
+        stage = get_current_stage()
+        boundaries = np.linspace(0, len(positions) - 1, min(17, len(positions)), dtype=int)
+        early_color = np.array((0.0, 0.75, 0.90))
+        late_color = np.array((1.0, 0.55, 0.05))
+
+        def time_color(index: int) -> tuple[float, float, float]:
+            fraction = index / max(1, len(positions) - 1)
+            return tuple(float(value) for value in early_color * (1 - fraction) + late_color * fraction)
+
+        for segment, (start, end) in enumerate(zip(boundaries[:-1], boundaries[1:])):
+            curve = UsdGeom.BasisCurves.Define(stage, f"/World/Waypoints/Path_{segment:02d}")
+            curve.CreateTypeAttr(UsdGeom.Tokens.linear)
+            curve.CreateCurveVertexCountsAttr([int(end - start + 1)])
+            curve.CreatePointsAttr([Gf.Vec3f(*position) for position in positions[start : end + 1]])
+            curve.CreateWidthsAttr([0.006])
+            curve.SetWidthsInterpolation(UsdGeom.Tokens.constant)
+            curve.CreateDisplayColorAttr([Gf.Vec3f(*time_color(int((start + end) // 2)))])
+
+        distance = np.r_[0.0, np.cumsum(np.linalg.norm(np.diff(np.asarray(positions), axis=0), axis=1))]
+        sample_indices = []
+        if distance[-1] > 0:
+            for target in np.linspace(0, distance[-1], 12)[1:-1]:
+                index = int(np.searchsorted(distance, target))
+                if all(
+                    np.linalg.norm(np.subtract(positions[index], positions[other])) >= 0.022
+                    for other in (0, *sample_indices, len(positions) - 1)
+                ):
+                    sample_indices.append(index)
+        for index in sample_indices:
+            marker = SphereCfg(
+                radius=0.009,
+                visual_material=PreviewSurfaceCfg(diffuse_color=time_color(index)),
+            )
+            spawn_sphere(f"/World/Waypoints/Frame_{waypoints[index][0]}", marker, translation=positions[index])
+
+        start_marker = SphereCfg(
+            radius=0.022,
+            visual_material=PreviewSurfaceCfg(diffuse_color=(0.05, 0.9, 0.25)),
+        )
+        spawn_sphere("/World/Waypoints/Start", start_marker, translation=positions[0])
+        if len(positions) > 1:
+            end_marker = SphereCfg(
+                radius=0.022,
+                visual_material=PreviewSurfaceCfg(diffuse_color=(0.95, 0.1, 0.1)),
+            )
+            spawn_sphere("/World/Waypoints/End", end_marker, translation=positions[-1])
         if camera_position is not None:
             camera_marker = SphereCfg(
-                radius=0.04,
+                radius=0.025,
                 visual_material=PreviewSurfaceCfg(diffuse_color=(0.0, 0.25, 1.0)),
             )
             spawn_sphere("/World/EstimatedCameraPosition", camera_marker, translation=camera_position)
@@ -142,6 +187,7 @@ def main() -> None:
         save_images_to_file(camera.data.output["rgb"].torch.float() / 255.0, str(output))
         frame = "world-frame" if aligned else "raw camera-frame"
         print(f"Saved {len(waypoints)} {frame} waypoints to {output.resolve()}", flush=True)
+        print("Path: cyan to orange over time; green start, red end", flush=True)
         if camera_position is not None:
             print(f"Blue camera-position marker: {camera_position}", flush=True)
 

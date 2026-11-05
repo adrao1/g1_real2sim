@@ -8,14 +8,14 @@ See `configs/tracking/README.md` for the camera and world frame conventions.
 uv run --extra isaacsim isaaclab zero_agent \
   --task G1Real2sim-PickPlace-G1 --num_envs 1 --device cpu --viz kit
 
-# Save raw banana FoundationPose waypoints (magenta); this config has no
+# Save raw banana FoundationPose path; this config has no
 # world_from_camera, so it does not show a camera-position marker.
 uv run --extra isaacsim python scripts/visualize_waypoints.py \
   --tracking-config configs/tracking/banana_d415_01.yml
 
 # After tracking the cracker box with assets/ycb/cracker_box/tracking/textured.obj
-# and --debug_dir debug_cracker_box, view approximately world-aligned waypoints
-# (magenta) and the camera position from world_from_camera (blue).
+# and --debug_dir debug_cracker_box, view the approximately world-aligned path
+# (cyan to orange, green start, red end) and estimated camera position (blue).
 uv run --extra isaacsim python scripts/visualize_waypoints.py \
   --tracking-config configs/tracking/cracker_box_d415_01.yml
 
