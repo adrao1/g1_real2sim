@@ -7,7 +7,8 @@ Run commands from this repository root.
 uv run --extra isaacsim isaaclab zero_agent \
   --task G1Real2sim-PickPlace-G1 --num_envs 1 --device cpu --viz kit
 
-# Save a screenshot with raw FoundationPose camera-frame positions as markers.
+# Save a screenshot with raw FoundationPose waypoints (magenta) and the
+# estimated camera position from the tracking config (blue).
 uv run --extra isaacsim python scripts/visualize_waypoints.py \
   --tracking-config configs/tracking/banana_d415_01.yml
 

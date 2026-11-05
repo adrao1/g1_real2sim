@@ -1,4 +1,4 @@
-"""Save a screenshot of raw FoundationPose positions in the tabletop scene."""
+"""Save a screenshot of raw FoundationPose positions and the estimated camera location."""
 
 from __future__ import annotations
 
@@ -18,8 +18,10 @@ from isaaclab.sim import PinholeCameraCfg, PreviewSurfaceCfg, SphereCfg
 from g1_real2sim.tasks.pick_place.config.g1.env_cfg import PickPlaceEnvCfg
 
 
-def load_waypoints(path: Path) -> tuple[Path, list[tuple[str, tuple[float, float, float]]]]:
-    """Read each FoundationPose translation as a simulator world position."""
+def load_waypoints(
+    path: Path,
+) -> tuple[Path, list[tuple[str, tuple[float, float, float]]], tuple[float, float, float] | None]:
+    """Read raw FoundationPose translations and an optional world camera position."""
     path = path.expanduser().resolve(strict=True)
     with path.open() as file:
         tracking = yaml.safe_load(file)
@@ -27,6 +29,16 @@ def load_waypoints(path: Path) -> tuple[Path, list[tuple[str, tuple[float, float
         raise ValueError(f"Tracking config must be a mapping: {path}")
     if not isinstance(tracking.get("item_config"), str) or not isinstance(tracking.get("pose_dir"), str):
         raise ValueError("Tracking config needs item_config and pose_dir paths")
+    camera_position = tracking.get("camera_position_world")
+    if camera_position is not None:
+        if (
+            not isinstance(camera_position, list)
+            or len(camera_position) != 3
+            or any(isinstance(value, bool) or not isinstance(value, (int, float)) for value in camera_position)
+            or not np.isfinite(camera_position).all()
+        ):
+            raise ValueError("camera_position_world must be three finite XYZ numbers")
+        camera_position = tuple(float(value) for value in camera_position)
     item_path = (path.parent / tracking["item_config"]).resolve(strict=True)
     pose_dir = (path.parent / tracking["pose_dir"]).resolve(strict=True)
     if not pose_dir.is_dir():
@@ -40,7 +52,7 @@ def load_waypoints(path: Path) -> tuple[Path, list[tuple[str, tuple[float, float
         if pose.shape != (4, 4) or not np.isfinite(pose).all() or not np.allclose(pose[3], (0, 0, 0, 1)):
             raise ValueError(f"Invalid 4x4 pose: {file}")
         waypoints.append((file.stem, tuple(float(value) for value in pose[:3, 3])))
-    return item_path, waypoints
+    return item_path, waypoints, camera_position
 
 
 def main() -> None:
@@ -55,7 +67,7 @@ def main() -> None:
 
     cfg = PickPlaceEnvCfg()
     try:
-        item_path, waypoints = load_waypoints(args.tracking_config)
+        item_path, waypoints, camera_position = load_waypoints(args.tracking_config)
         item_args = argparse.Namespace(item_config=item_path, item_position=None, item_rotation=None)
         item = configure_item(cfg, item_args)
     except (OSError, ValueError) as exc:
@@ -89,13 +101,22 @@ def main() -> None:
         marker = SphereCfg(radius=0.02, visual_material=PreviewSurfaceCfg(diffuse_color=(1.0, 0.0, 1.0)))
         for frame_id, position in waypoints:
             spawn_sphere(f"/World/Waypoints/Frame_{frame_id}", marker, translation=position)
+        if camera_position is not None:
+            camera_marker = SphereCfg(
+                radius=0.04,
+                visual_material=PreviewSurfaceCfg(diffuse_color=(0.0, 0.25, 1.0)),
+            )
+            spawn_sphere("/World/EstimatedCameraPosition", camera_marker, translation=camera_position)
         sim.reset()
         scene.reset()
         camera = scene["camera"]
         origin = scene.env_origins
         focus = torch.tensor(item.position, device=cfg.sim.device)
+        if camera_position is not None:
+            focus = (focus + torch.tensor(camera_position, device=cfg.sim.device)) / 2
+        view_offset = (1.2, 1.2, 0.8) if camera_position is not None else (0.9, 0.9, 0.65)
         camera.set_world_poses_from_view(
-            origin + focus + torch.tensor((0.9, 0.9, 0.65), device=cfg.sim.device),
+            origin + focus + torch.tensor(view_offset, device=cfg.sim.device),
             origin + focus,
         )
         robot = scene["robot"]
@@ -108,6 +129,8 @@ def main() -> None:
         output.parent.mkdir(parents=True, exist_ok=True)
         save_images_to_file(camera.data.output["rgb"].torch.float() / 255.0, str(output))
         print(f"Saved {len(waypoints)} raw camera-frame waypoints to {output.resolve()}", flush=True)
+        if camera_position is not None:
+            print(f"Blue camera-position marker: {camera_position}", flush=True)
 
 
 if __name__ == "__main__":
