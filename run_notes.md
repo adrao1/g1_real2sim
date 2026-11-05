@@ -7,9 +7,9 @@ Run commands from this repository root.
 uv run --extra isaacsim isaaclab zero_agent \
   --task G1Real2sim-PickPlace-G1 --num_envs 1 --device cpu --viz kit
 
-# Save a screenshot with a visual-only magenta sphere at the selected item's start position.
+# Save a screenshot with raw FoundationPose camera-frame positions as markers.
 uv run --extra isaacsim python scripts/visualize_waypoints.py \
-  --item-config configs/items/banana.yml
+  --tracking-config configs/tracking/banana_d415_01.yml
 
 # Save one screenshot of the mustard-bottle scene without generating grasps.
 uv run --extra isaacsim python scripts/screenshot_scene.py \
