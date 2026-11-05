@@ -4,9 +4,11 @@ The contact evaluator keeps the G1 robot and table from `TabletopSceneCfg` and
 replaces only the rigid item at `{ENV_REGEX_NS}/Object`. Copy this example into
 `configs/items/my_item.yml` and use your own **local, physics-ready USD**:
 
-The bundled banana and mustard bottle presets use USDs under `assets/ycb/`,
-one folder per item. Keep referenced textures beside those USDs in the same
-relative directory structure; see `assets/ycb/README.md` for provenance.
+The bundled banana, cracker box, and mustard bottle presets use USDs under
+`assets/ycb/`, one folder per item. Keep referenced textures beside those USDs
+in the same relative directory structure. The corresponding FoundationPose
+OBJs are in each item's `tracking/` folder; see `assets/ycb/README.md` for
+provenance and the export command.
 
 ```yaml
 name: my_item

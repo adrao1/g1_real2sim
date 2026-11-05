@@ -1,16 +1,21 @@
 """Fixed-base G1 tabletop scene with a graspable object."""
 
+from pathlib import Path
+
 from isaaclab.assets import ArticulationCfg, AssetBaseCfg, RigidObjectCfg
 from isaaclab.scene import InteractiveSceneCfg
 from isaaclab.sim import DomeLightCfg, GroundPlaneCfg, UsdFileCfg, UsdPhysicsRigidBodyCfg
 from isaaclab.utils import clone, configclass
-from isaaclab.utils.assets import ISAAC_NUCLEUS_DIR, ISAACLAB_NUCLEUS_DIR
+from isaaclab.utils.assets import ISAACLAB_NUCLEUS_DIR
 
 from isaaclab_assets.robots.unitree import G1_29DOF_CFG
 
 from g1_real2sim.assets import G1_REAL2SIM_ASSETS_DIR
 
 UNITREE_G1_USD = G1_REAL2SIM_ASSETS_DIR / "robots/g1-29dof-dex3-base-fix-usd/g1_29dof_with_dex3_base_fix.usd"
+CRACKER_BOX_USD = (
+    Path(__file__).resolve().parents[3] / "assets/ycb/cracker_box/Axis_Aligned_Physics/003_cracker_box.usd"
+)
 
 
 @configclass
@@ -36,7 +41,7 @@ class TabletopSceneCfg(InteractiveSceneCfg):
             rot=(0.7071068, 0.0, 0.0, 0.7071068),
         ),
         spawn=UsdFileCfg(
-            usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/YCB/Axis_Aligned_Physics/003_cracker_box.usd",
+            usd_path=str(CRACKER_BOX_USD),
             rigid_props=UsdPhysicsRigidBodyCfg(),
         ),
     )

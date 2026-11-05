@@ -1,0 +1,5 @@
+name: cracker_box
+usd_path: ../../assets/ycb/cracker_box/Axis_Aligned_Physics/003_cracker_box.usd
+scale: 1.0
+position: [0.0, 0.40, 0.87]
+rotation_xyzw: [0.7071068, 0.0, 0.0, 0.7071068]

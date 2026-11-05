@@ -15,6 +15,9 @@ uv run --extra isaacsim python scripts/visualize_waypoints.py \
 uv run --extra isaacsim python scripts/screenshot_scene.py \
   --item-config configs/items/mustard_bottle.yml
 
+# Re-export FoundationPose meshes from the simulator's visual USDs.
+.venv/bin/python scripts/export_ycb_tracking_meshes.py
+
 # Evaluate every grasp in the bundled cracker-box YAML. Video is on by default;
 # 25 grasps run in parallel per batch. Only successful clips are retained.
 uv run --extra isaacsim --extra video python scripts/evaluate_contact_grasps.py
