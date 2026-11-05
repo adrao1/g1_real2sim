@@ -28,17 +28,17 @@ uv run --extra isaacsim python scripts/visualize_grasps.py \
   --tracking-config configs/tracking/cracker_box_d415_03.yml \
   --grasps 56 68 88
 
-# Pick the cracker box with grasp 22, follow its tracked 6D motion, then
-# release at the final tracked pose. Set --tracking-fps to the recording's FPS.
+# Approach and grasp the cracker box at recording 04's first pose in Kit.
+# The script stops after confirming sustained finger contact.
 uv run --extra isaacsim python scripts/replay_tracked_pick_place.py \
   --tracking-config configs/tracking/cracker_box_d415_04.yml \
-  --grasp-id 22 --tracking-fps 30 --viz kit
+  --grasp-id 22 --viz kit
 
-# Save the full pick, carry, and place replay as an MP4 without a viewport.
-# The script prints the output path under outputs/tracking_replays/.
+# Save the grasp-only run as an MP4 without a viewport.
+# The script prints the output path under outputs/tracked_grasps/.
 uv run --extra isaacsim --extra video python scripts/replay_tracked_pick_place.py \
   --tracking-config configs/tracking/cracker_box_d415_04.yml \
-  --grasp-id 22 --tracking-fps 30 --record-video
+  --grasp-id 22 --record-video
 
 # Save one screenshot of the mustard-bottle scene without generating grasps.
 uv run --extra isaacsim python scripts/screenshot_scene.py \
