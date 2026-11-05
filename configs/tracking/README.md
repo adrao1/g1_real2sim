@@ -29,12 +29,14 @@ is not a measured camera orientation.
 FoundationPose pose files are `camera_from_mesh` transforms. For a tracking
 OBJ exported in the simulator USD's object-root frame, the waypoint script
 computes `world_from_item = world_from_camera @ camera_from_mesh`. It plots
-only the resulting translation, so a good waypoint screenshot does not by
-itself validate the item's orientation. When `world_from_camera` is `null`,
-the script plots the raw camera-frame translations instead.
+the complete position path and XYZ orientation arrows at selected frames.
+When `world_from_camera` is `null`, it plots raw camera-frame poses instead.
 
 The blue camera marker uses the translation column of `world_from_camera`.
-When the matrix is `null`, the marker is omitted.
+Its larger XYZ arrows show the camera orientation. Red, green, and blue arrows
+indicate positive X, Y, and Z for both item and camera poses. When the matrix
+is `null`, the camera marker and arrows are omitted. The camera orientation is
+still an estimate; visualizing it does not calibrate it.
 
 `scripts/replay_tracked_pick_place.py` requires `world_from_camera` and uses
 each full object pose, including its rotation. It initializes the simulated

@@ -1,4 +1,4 @@
-"""Save a screenshot of FoundationPose waypoints and the estimated camera location."""
+"""Save a screenshot of FoundationPose positions, orientations, and camera pose."""
 
 from __future__ import annotations
 
@@ -37,8 +37,8 @@ def _matrix(value: object, label: str) -> np.ndarray | None:
 
 def load_waypoints(
     path: Path,
-) -> tuple[Path, list[tuple[str, tuple[float, float, float]]], tuple[float, float, float] | None, bool]:
-    """Read FoundationPose poses, transforming them to world XYZ when calibrated."""
+) -> tuple[Path, list[tuple[str, np.ndarray]], np.ndarray | None]:
+    """Read FoundationPose poses, transforming full poses to world when aligned."""
     path = path.expanduser().resolve(strict=True)
     with path.open() as file:
         tracking = yaml.safe_load(file)
@@ -48,7 +48,6 @@ def load_waypoints(
         raise ValueError("Tracking config needs item_config and pose_dir paths")
     world_from_camera = _matrix(tracking.get("world_from_camera"), "world_from_camera")
     aligned = world_from_camera is not None
-    camera_position = tuple(float(value) for value in world_from_camera[:3, 3]) if aligned else None
     item_path = (path.parent / tracking["item_config"]).resolve(strict=True)
     pose_dir = (path.parent / tracking["pose_dir"]).resolve(strict=True)
     if not pose_dir.is_dir():
@@ -63,8 +62,8 @@ def load_waypoints(
             raise ValueError(f"Invalid 4x4 pose: {file}")
         if aligned:
             pose = world_from_camera @ pose
-        waypoints.append((file.stem, tuple(float(value) for value in pose[:3, 3])))
-    return item_path, waypoints, camera_position, aligned
+        waypoints.append((file.stem, pose))
+    return item_path, waypoints, world_from_camera
 
 
 def main() -> None:
@@ -79,7 +78,10 @@ def main() -> None:
 
     cfg = PickPlaceEnvCfg()
     try:
-        item_path, waypoints, camera_position, aligned = load_waypoints(args.tracking_config)
+        item_path, waypoints, world_from_camera = load_waypoints(args.tracking_config)
+        camera_position = (
+            tuple(float(value) for value in world_from_camera[:3, 3]) if world_from_camera is not None else None
+        )
         item_args = argparse.Namespace(item_config=item_path, item_position=None, item_rotation=None)
         item = configure_item(cfg, item_args)
     except (OSError, ValueError) as exc:
@@ -111,7 +113,7 @@ def main() -> None:
         sim = SimulationContext(cfg.sim)
         scene = InteractiveScene(cfg.scene)
         create_prim("/World/Waypoints", prim_type="Xform")
-        positions = [position for _, position in waypoints]
+        positions = [tuple(float(value) for value in pose[:3, 3]) for _, pose in waypoints]
         stage = get_current_stage()
         boundaries = np.linspace(0, len(positions) - 1, min(17, len(positions)), dtype=int)
         early_color = np.array((0.0, 0.75, 0.90))
@@ -121,7 +123,34 @@ def main() -> None:
             fraction = index / max(1, len(positions) - 1)
             return tuple(float(value) for value in early_color * (1 - fraction) + late_color * fraction)
 
-        for segment, (start, end) in enumerate(zip(boundaries[:-1], boundaries[1:])):
+        def draw_axes(path: str, pose: np.ndarray, length: float, width: float) -> None:
+            """Draw RGB XYZ arrows from the translation and rotation of a pose."""
+            center = pose[:3, 3]
+            for axis, (label, color) in enumerate(
+                (("X", (1.0, 0.1, 0.1)), ("Y", (0.1, 0.85, 0.1)), ("Z", (0.1, 0.35, 1.0)))
+            ):
+                direction = pose[:3, axis]
+                direction = direction / np.linalg.norm(direction)
+                side = pose[:3, (axis + 1) % 3]
+                side = side / np.linalg.norm(side)
+                tip = center + length * direction
+                wing = tip - 0.25 * length * direction
+                points = (
+                    center,
+                    tip,
+                    wing + 0.12 * length * side,
+                    tip,
+                    wing - 0.12 * length * side,
+                )
+                curve = UsdGeom.BasisCurves.Define(stage, f"{path}_{label}")
+                curve.CreateTypeAttr(UsdGeom.Tokens.linear)
+                curve.CreateCurveVertexCountsAttr([2, 3])
+                curve.CreatePointsAttr([Gf.Vec3f(*map(float, point)) for point in points])
+                curve.CreateWidthsAttr([width])
+                curve.SetWidthsInterpolation(UsdGeom.Tokens.constant)
+                curve.CreateDisplayColorAttr([Gf.Vec3f(*color)])
+
+        for segment, (start, end) in enumerate(zip(boundaries[:-1], boundaries[1:], strict=True)):
             curve = UsdGeom.BasisCurves.Define(stage, f"/World/Waypoints/Path_{segment:02d}")
             curve.CreateTypeAttr(UsdGeom.Tokens.linear)
             curve.CreateCurveVertexCountsAttr([int(end - start + 1)])
@@ -152,18 +181,24 @@ def main() -> None:
             visual_material=PreviewSurfaceCfg(diffuse_color=(0.05, 0.9, 0.25)),
         )
         spawn_sphere("/World/Waypoints/Start", start_marker, translation=positions[0])
+        orientation_indices = [0, *sample_indices[::2]]
         if len(positions) > 1:
             end_marker = SphereCfg(
                 radius=0.022,
                 visual_material=PreviewSurfaceCfg(diffuse_color=(0.95, 0.1, 0.1)),
             )
             spawn_sphere("/World/Waypoints/End", end_marker, translation=positions[-1])
+            orientation_indices.append(len(positions) - 1)
+        for index in orientation_indices:
+            frame_id, pose = waypoints[index]
+            draw_axes(f"/World/Waypoints/Orientation_{frame_id}", pose, length=0.045, width=0.003)
         if camera_position is not None:
             camera_marker = SphereCfg(
                 radius=0.025,
                 visual_material=PreviewSurfaceCfg(diffuse_color=(0.0, 0.25, 1.0)),
             )
             spawn_sphere("/World/EstimatedCameraPosition", camera_marker, translation=camera_position)
+            draw_axes("/World/EstimatedCameraOrientation", world_from_camera, length=0.12, width=0.005)
         sim.reset()
         scene.reset()
         camera = scene["camera"]
@@ -185,9 +220,10 @@ def main() -> None:
 
         output.parent.mkdir(parents=True, exist_ok=True)
         save_images_to_file(camera.data.output["rgb"].torch.float() / 255.0, str(output))
-        frame = "world-frame" if aligned else "raw camera-frame"
+        frame = "world-frame" if world_from_camera is not None else "raw camera-frame"
         print(f"Saved {len(waypoints)} {frame} waypoints to {output.resolve()}", flush=True)
         print("Path: cyan to orange over time; green start, red end", flush=True)
+        print("Orientation arrows: red +X, green +Y, blue +Z", flush=True)
         if camera_position is not None:
             print(f"Blue camera-position marker: {camera_position}", flush=True)
 

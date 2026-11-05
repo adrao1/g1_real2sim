@@ -10,7 +10,8 @@ uv run --extra isaacsim isaaclab zero_agent \
 
 # After tracking the cracker box with assets/ycb/cracker_box/tracking/textured.obj
 # and --debug_dir debug_cracker_box, view the approximately world-aligned path
-# (cyan to orange, green start, red end) and estimated camera position (blue).
+# (cyan to orange, green start, red end), sampled XYZ orientation arrows
+# (red X, green Y, blue Z), and the estimated camera pose (blue sphere + axes).
 uv run --extra isaacsim python scripts/visualize_waypoints.py \
   --tracking-config configs/tracking/cracker_box_d415_01.yml
 
