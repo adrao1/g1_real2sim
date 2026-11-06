@@ -78,11 +78,23 @@ def main() -> None:
 
     cfg = PickPlaceEnvCfg()
     try:
+        import torch
+
+        from isaaclab.utils.math import quat_from_matrix
+
         item_path, waypoints, world_from_camera = load_waypoints(args.tracking_config)
         camera_position = (
             tuple(float(value) for value in world_from_camera[:3, 3]) if world_from_camera is not None else None
         )
-        item_args = argparse.Namespace(item_config=item_path, item_position=None, item_rotation=None)
+        first_pose = waypoints[0][1]
+        quaternion = quat_from_matrix(torch.as_tensor(first_pose[:3, :3], dtype=torch.float64))
+        if not bool(torch.isfinite(quaternion).all()):
+            raise ValueError(f"First tracked rotation cannot be converted to a quaternion: {args.tracking_config}")
+        item_args = argparse.Namespace(
+            item_config=item_path,
+            item_position=tuple(float(value) for value in first_pose[:3, 3]),
+            item_rotation=tuple(float(value) for value in quaternion),
+        )
         item = configure_item(cfg, item_args)
     except (OSError, ValueError) as exc:
         parser.error(str(exc))
@@ -103,7 +115,6 @@ def main() -> None:
     )
 
     with launch_simulation(cfg, args):
-        import torch
         from pxr import Gf, UsdGeom
 
         from isaaclab.scene import InteractiveScene
