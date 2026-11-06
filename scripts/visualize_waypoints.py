@@ -1,4 +1,4 @@
-"""Save a screenshot of FoundationPose positions, orientations, and camera pose."""
+"""Save a screenshot of FoundationPose positions and camera pose."""
 
 from __future__ import annotations
 
@@ -115,13 +115,7 @@ def main() -> None:
         create_prim("/World/Waypoints", prim_type="Xform")
         positions = [tuple(float(value) for value in pose[:3, 3]) for _, pose in waypoints]
         stage = get_current_stage()
-        boundaries = np.linspace(0, len(positions) - 1, min(17, len(positions)), dtype=int)
-        early_color = np.array((0.0, 0.75, 0.90))
-        late_color = np.array((1.0, 0.55, 0.05))
-
-        def time_color(index: int) -> tuple[float, float, float]:
-            fraction = index / max(1, len(positions) - 1)
-            return tuple(float(value) for value in early_color * (1 - fraction) + late_color * fraction)
+        waypoint_color = (0.05, 0.45, 0.85)
 
         def draw_axes(path: str, pose: np.ndarray, length: float, width: float) -> None:
             """Draw RGB XYZ arrows from the translation and rotation of a pose."""
@@ -150,15 +144,6 @@ def main() -> None:
                 curve.SetWidthsInterpolation(UsdGeom.Tokens.constant)
                 curve.CreateDisplayColorAttr([Gf.Vec3f(*color)])
 
-        for segment, (start, end) in enumerate(zip(boundaries[:-1], boundaries[1:], strict=True)):
-            curve = UsdGeom.BasisCurves.Define(stage, f"/World/Waypoints/Path_{segment:02d}")
-            curve.CreateTypeAttr(UsdGeom.Tokens.linear)
-            curve.CreateCurveVertexCountsAttr([int(end - start + 1)])
-            curve.CreatePointsAttr([Gf.Vec3f(*position) for position in positions[start : end + 1]])
-            curve.CreateWidthsAttr([0.006])
-            curve.SetWidthsInterpolation(UsdGeom.Tokens.constant)
-            curve.CreateDisplayColorAttr([Gf.Vec3f(*time_color(int((start + end) // 2)))])
-
         distance = np.r_[0.0, np.cumsum(np.linalg.norm(np.diff(np.asarray(positions), axis=0), axis=1))]
         sample_indices = []
         if distance[-1] > 0:
@@ -172,26 +157,21 @@ def main() -> None:
         for index in sample_indices:
             marker = SphereCfg(
                 radius=0.009,
-                visual_material=PreviewSurfaceCfg(diffuse_color=time_color(index)),
+                visual_material=PreviewSurfaceCfg(diffuse_color=waypoint_color),
             )
             spawn_sphere(f"/World/Waypoints/Frame_{waypoints[index][0]}", marker, translation=positions[index])
 
         start_marker = SphereCfg(
-            radius=0.022,
-            visual_material=PreviewSurfaceCfg(diffuse_color=(0.05, 0.9, 0.25)),
+            radius=0.009,
+            visual_material=PreviewSurfaceCfg(diffuse_color=waypoint_color),
         )
         spawn_sphere("/World/Waypoints/Start", start_marker, translation=positions[0])
-        orientation_indices = [0, *sample_indices[::2]]
         if len(positions) > 1:
             end_marker = SphereCfg(
-                radius=0.022,
-                visual_material=PreviewSurfaceCfg(diffuse_color=(0.95, 0.1, 0.1)),
+                radius=0.009,
+                visual_material=PreviewSurfaceCfg(diffuse_color=waypoint_color),
             )
             spawn_sphere("/World/Waypoints/End", end_marker, translation=positions[-1])
-            orientation_indices.append(len(positions) - 1)
-        for index in orientation_indices:
-            frame_id, pose = waypoints[index]
-            draw_axes(f"/World/Waypoints/Orientation_{frame_id}", pose, length=0.045, width=0.003)
         if camera_position is not None:
             camera_marker = SphereCfg(
                 radius=0.025,
@@ -222,10 +202,10 @@ def main() -> None:
         save_images_to_file(camera.data.output["rgb"].torch.float() / 255.0, str(output))
         frame = "world-frame" if world_from_camera is not None else "raw camera-frame"
         print(f"Saved {len(waypoints)} {frame} waypoints to {output.resolve()}", flush=True)
-        print("Path: cyan to orange over time; green start, red end", flush=True)
-        print("Orientation arrows: red +X, green +Y, blue +Z", flush=True)
+        print("Object waypoints: light blue spheres", flush=True)
         if camera_position is not None:
             print(f"Blue camera-position marker: {camera_position}", flush=True)
+            print("Camera orientation arrows: red +X, green +Y, blue +Z", flush=True)
 
 
 if __name__ == "__main__":
