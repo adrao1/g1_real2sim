@@ -5,6 +5,38 @@ An installable downstream Isaac Lab task package with a standard uv `src` layout
 The registered tasks are:
 - `G1Real2sim-PickPlace-G1`
 
+## Pipeline
+
+### RGB-D recording
+
+* Intel RealSense D415 at 30 fps
+* Capture script saves RGB, depth frames, and camera intrinsics
+
+### FoundationPose 6D object poses
+
+* Outputs position and rotation for each frame using the object mesh
+
+### Camera to sim alignment
+
+* Convert camera pose in real world to sim coordinates
+* Object pose in camera frame -> apply camera to sim transform -> object pose in sim coords
+
+### GraspGenX candidate grasps
+
+* Generate 100 candidate grasps from object USD and G1 hand model
+
+### Grasp evaluation at first recorded pose
+
+* Place object at initial recorded position
+* Test all candidate grasps with approach, finger closure, and lift
+
+### Wrist IK to follow object trajectory
+
+* Measure wrist pose relative to object after grasping
+* Convert each recorded object position and rotation into a wrist target
+* Use IK to follow those targets
+* Release object at final recorded pose
+
 ## Implement the Task
 
 This project contains task scaffolding. Before running or training, replace `MISSING` configuration values and
